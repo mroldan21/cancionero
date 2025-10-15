@@ -31,7 +31,7 @@ class _PresentationModeScreenState extends State<PresentationModeScreen> {
   @override
   void initState() {
     super.initState();
-    _currentCapo = widget.song.posicionCapo;
+    _currentCapo = widget.song.capoPosition;
     _currentSongIndex = widget.initialIndex;
   }
 

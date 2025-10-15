@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'cancion_list_screen.dart';
+import 'song_list_screen.dart';
 import 'setlist_management_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
@@ -13,7 +13,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
 
   static final List<Widget> _widgetOptions = <Widget>[
-    const CancionListScreen(),
+    const SongListScreen(),
     const SetlistManagementScreen(),
     const PlaceholderWidget(title: 'Categories'),
     const PlaceholderWidget(title: 'Favorites'),

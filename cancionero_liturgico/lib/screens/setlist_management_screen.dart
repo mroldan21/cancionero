@@ -309,7 +309,7 @@ class SetlistDetailScreen extends StatefulWidget {
 }
 
 class _SetlistDetailScreenState extends State<SetlistDetailScreen> {
-  List<Cancion> _songs = [];
+  List<Song> _songs = [];
   bool _isLoading = true;
 
   @override
@@ -323,7 +323,7 @@ class _SetlistDetailScreenState extends State<SetlistDetailScreen> {
     await Future.delayed(const Duration(milliseconds: 500));
     setState(() {
       _songs = [
-        Cancion(
+        Song(
           id: 1,
           titulo: "Amazing Grace",
           autor: "John Newton",
@@ -336,7 +336,7 @@ class _SetlistDetailScreenState extends State<SetlistDetailScreen> {
           fechaCreacion: DateTime.now(),
           fechaModificacion: DateTime.now(),
         ),
-        Cancion(
+        Song(
           id: 2,
           titulo: "How Great Thou Art",
           autor: "Carl Boberg",
