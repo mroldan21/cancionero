@@ -1,106 +1,122 @@
 import 'package:flutter/material.dart';
 
-class TranspositionControls extends StatelessWidget {
-  final int currentTransposition;
-  final String originalKey;
-  final String currentKey;
-  final VoidCallback onTransposeUp;
-  final VoidCallback onTransposeDown;
+class TransposicionControls extends StatelessWidget {
+  final int semitonosActual;
+  final ValueChanged<int> onTransponer;
   final VoidCallback onReset;
+  final int capoActual;
+  final ValueChanged<int> onCapoChanged;
 
-  const TranspositionControls({
-    super.key,
-    required this.currentTransposition,
-    required this.originalKey,
-    required this.currentKey,
-    required this.onTransposeUp,
-    required this.onTransposeDown,
+  const TransposicionControls({
+    Key? key,
+    required this.semitonosActual,
+    required this.onTransponer,
     required this.onReset,
-  });
+    required this.capoActual,
+    required this.onCapoChanged,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.all(16.0),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Transposición',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+            Text(
+              'Ajustes de Tono',
+              style: Theme.of(context).textTheme.titleMedium,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
+            
+            // Controles de transposición
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Controles de transposición
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_downward),
-                      onPressed: currentTransposition > -11 ? onTransposeDown : null,
-                      tooltip: 'Bajar semitono',
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        currentTransposition == 0 
-                            ? 'Original' 
-                            : currentTransposition > 0 
-                                ? '+$currentTransposition' 
-                                : '$currentTransposition',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.arrow_upward),
-                      onPressed: currentTransposition < 11 ? onTransposeUp : null,
-                      tooltip: 'Subir semitono',
-                    ),
-                  ],
-                ),
-                // Información de tonalidad
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      'Tono: $currentKey',
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                    if (currentTransposition != 0)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        'Original: $originalKey',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                        'Transposición',
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
-                  ],
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.remove),
+                            onPressed: semitonosActual > -11 
+                                ? () => onTransponer(semitonosActual - 1)
+                                : null,
+                          ),
+                          Expanded(
+                            child: Text(
+                              semitonosActual == 0 
+                                  ? 'Original' 
+                                  : '${semitonosActual > 0 ? '+' : ''}$semitonosActual',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.add),
+                            onPressed: semitonosActual < 11 
+                                ? () => onTransponer(semitonosActual + 1)
+                                : null,
+                          ),
+                          if (semitonosActual != 0)
+                            IconButton(
+                              icon: const Icon(Icons.refresh),
+                              onPressed: onReset,
+                              tooltip: 'Resetear a tono original',
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const VerticalDivider(),
+                
+                // Controles de capo
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Capotraste',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.remove),
+                            onPressed: capoActual > 0 
+                                ? () => onCapoChanged(capoActual - 1)
+                                : null,
+                          ),
+                          Expanded(
+                            child: Text(
+                              capoActual == 0 ? 'Sin capo' : 'Traste $capoActual',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.add),
+                            onPressed: capoActual < 12 
+                                ? () => onCapoChanged(capoActual + 1)
+                                : null,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-            if (currentTransposition != 0) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: onReset,
-                  child: const Text('Resetear a original'),
-                ),
-              ),
-            ],
           ],
         ),
       ),
