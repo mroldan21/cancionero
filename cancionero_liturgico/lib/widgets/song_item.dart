@@ -23,7 +23,6 @@ class SongItem extends StatelessWidget {
     if (onTap != null) {
       onTap!();
     } else {
-      // Navegación por defecto a la pantalla de detalles
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -94,13 +93,16 @@ class SongItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: ListTile(
-        leading: _buildSongLeading(),
-        title: _buildSongTitle(),
-        subtitle: _buildSongSubtitle(),
-        trailing: _buildSongTrailing(context),
+      child: InkWell(
         onTap: () => _handleTap(context),
         onLongPress: () => _showOptionsMenu(context),
+        child: ListTile(
+          leading: _buildSongLeading(),
+          title: _buildSongTitle(),
+          subtitle: _buildSongSubtitle(),
+          trailing: _buildSongTrailing(context),
+          contentPadding: const EdgeInsets.only(left: 16, right: 4), // ✅ MÁXIMO ESPACIO
+        ),
       ),
     );
   }
@@ -128,12 +130,12 @@ class SongItem extends StatelessWidget {
 
   Widget _buildSongTitle() {
     return Text(
-      song.title, // ✅ CORREGIDO: usar title en lugar de titulo
+      song.title,
       style: const TextStyle(
         fontWeight: FontWeight.bold,
         fontSize: 16,
       ),
-      maxLines: 1,
+      maxLines: 2, // ✅ MÁS LÍNEAS PARA TÍTULOS LARGOS
       overflow: TextOverflow.ellipsis,
     );
   }
@@ -144,22 +146,22 @@ class SongItem extends StatelessWidget {
       children: [
         if (song.artist != null && song.artist!.isNotEmpty)
           Text(
-            song.artist!, // ✅ CORREGIDO: usar artist en lugar de autor
+            song.artist!,
             style: const TextStyle(fontSize: 14),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-        const SizedBox(height: 2),
-        Row(
+        const SizedBox(height: 4),
+        // ✅ CORREGIDO: Usar Wrap en lugar de Row para evitar overflow
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
           children: [
-            _buildInfoChip('Key: ${song.originalKey}'), // ✅ CORREGIDO: usar originalKey
-            const SizedBox(width: 4),
+            _buildInfoChip('Key: ${song.originalKey}'),
             if (song.capoPosition > 0)
-              _buildInfoChip('Capo: ${song.capoPosition}'), // ✅ CORREGIDO: usar capoPosition
-            if (song.tempoBpm != null) ...[
-              const SizedBox(width: 4),
+              _buildInfoChip('Capo: ${song.capoPosition}'),
+            if (song.tempoBpm != null)
               _buildInfoChip('${song.tempoBpm} BPM'),
-            ],
           ],
         ),
       ],
@@ -184,47 +186,50 @@ class SongItem extends StatelessWidget {
     );
   }
 
+  // Widget _buildSongTrailing(BuildContext context) {
+  //   return SizedBox(
+  //     width: 60, // ✅ ANCHO MÍNIMO ABSOLUTO
+  //     child: Row(
+  //       mainAxisSize: MainAxisSize.min,
+  //       mainAxisAlignment: MainAxisAlignment.end,
+  //       children: [
+  //         // Botón de presentación
+  //         IconButton(
+  //           icon: const Icon(Icons.slideshow, size: 18), // ✅ TAMAÑO REDUCIDO
+  //           onPressed: () => _handlePresentationMode(context),
+  //           tooltip: 'Presentation Mode',
+  //           padding: const EdgeInsets.all(2), // ✅ PADDING MÍNIMO
+  //           constraints: const BoxConstraints(minWidth: 20, minHeight: 20), // ✅ CONSTRAINTS MÍNIMOS
+  //           iconSize: 18, // ✅ TAMAÑO FIJO PEQUEÑO
+  //         ),
+  //         // Menú de opciones
+  //         IconButton(
+  //           icon: const Icon(Icons.more_vert, size: 18), // ✅ TAMAÑO REDUCIDO
+  //           onPressed: () => _showOptionsMenu(context),
+  //           tooltip: 'More options',
+  //           padding: const EdgeInsets.all(2), // ✅ PADDING MÍNIMO
+  //           constraints: const BoxConstraints(minWidth: 20, minHeight: 20), // ✅ CONSTRAINTS MÍNIMOS
+  //           iconSize: 18, // ✅ TAMAÑO FIJO PEQUEÑO
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
+
   Widget _buildSongTrailing(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // Botón de modo presentación
-        IconButton(
-          icon: const Icon(Icons.slideshow, size: 20),
-          onPressed: () => _handlePresentationMode(context),
-          tooltip: 'Presentation Mode',
-          color: Colors.blue,
-        ),
-        
-        // Contador de reproducciones
-        if (song.playCount > 0)
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.play_arrow, size: 14, color: Colors.grey),
-                const SizedBox(width: 2),
-                Text(
-                  '${song.playCount}',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-              ],
-            ),
-          ),
-        
-        // Menú de opciones
-        IconButton(
-          icon: const Icon(Icons.more_vert, size: 20),
-          onPressed: () => _showOptionsMenu(context),
-          tooltip: 'More options',
-        ),
-      ],
+    return const SizedBox(
+      width: 48, // ✅ ANCHO MÍNIMO ABSOLUTO
+      height: 48, // ✅ ALTO FIJO
+      child: Icon(
+        Icons.more_vert, 
+        size: 20,
+        color: Colors.grey,
+      ),
     );
   }
 }
 
-// Widget alternativo para listas más compactas
+// Widget alternativo MÁS COMPACTO para cuando hay overflow
 class SongItemCompact extends StatelessWidget {
   final Song song;
   final VoidCallback? onTap;
@@ -237,32 +242,36 @@ class SongItemCompact extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: const Icon(Icons.music_note, size: 24),
-      title: Text(
-        song.title, // ✅ CORREGIDO: usar title
-        style: const TextStyle(fontSize: 14),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: ListTile(
+        leading: const Icon(Icons.music_note, size: 20),
+        title: Text(
+          song.title,
+          style: const TextStyle(fontSize: 14),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: song.artist != null 
+            ? Text(
+                song.artist!,
+                style: const TextStyle(fontSize: 12),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              )
+            : null,
+        trailing: song.isFavorite 
+            ? const Icon(Icons.favorite, size: 16, color: Colors.red)
+            : null,
+        onTap: onTap,
+        dense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12),
       ),
-      subtitle: song.artist != null 
-          ? Text(
-              song.artist!, // ✅ CORREGIDO: usar artist
-              style: const TextStyle(fontSize: 12),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            )
-          : null,
-      trailing: song.isFavorite 
-          ? const Icon(Icons.favorite, size: 16, color: Colors.red)
-          : null,
-      onTap: onTap,
-      dense: true,
     );
   }
 }
 
-// Widget para grid view
+// ✅ RESTAURADO: Widget para grid view
 class SongGridItem extends StatelessWidget {
   final Song song;
   final VoidCallback? onTap;
@@ -297,7 +306,7 @@ class SongGridItem extends StatelessWidget {
               
               // Título
               Text(
-                song.title, // ✅ CORREGIDO: usar title
+                song.title,
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 14,
@@ -311,7 +320,7 @@ class SongGridItem extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
-                    song.artist!, // ✅ CORREGIDO: usar artist
+                    song.artist!,
                     style: const TextStyle(
                       fontSize: 12,
                       color: Colors.grey,
@@ -327,7 +336,7 @@ class SongGridItem extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    song.originalKey, // ✅ CORREGIDO: usar originalKey
+                    song.originalKey,
                     style: const TextStyle(
                       fontSize: 11,
                       color: Colors.grey,
@@ -341,7 +350,7 @@ class SongGridItem extends StatelessWidget {
                         const Icon(Icons.play_arrow, size: 12, color: Colors.grey),
                         const SizedBox(width: 2),
                         Text(
-                          '${song.playCount}',
+                          song.playCount > 99 ? '99+' : '${song.playCount}',
                           style: const TextStyle(fontSize: 11, color: Colors.grey),
                         ),
                       ],
