@@ -22,7 +22,7 @@ class _PresentationModeScreenState extends State<PresentationModeScreen> {
   int _currentTransposition = 0;
   int _currentCapo = 0;
   bool _isAutoScrolling = false;
-  double _scrollSpeed = 1.0;
+  double _scrollSpeed = 0.7;
   double _fontSize = 22.0;
   bool _isDarkMode = true;
   int _currentSongIndex = 0;
@@ -76,7 +76,7 @@ class _PresentationModeScreenState extends State<PresentationModeScreen> {
   }
 
   double _calculateScrollSpeed() {
-    final double baseSpeed = 50.0;
+    final double baseSpeed = 15.0;
     final double tempoFactor = (widget.song.tempoBpm ?? 120) / 60.0;
     return baseSpeed * tempoFactor * _scrollSpeed;
   }
@@ -324,18 +324,37 @@ class _PresentationModeScreenState extends State<PresentationModeScreen> {
       onTap: _toggleAutoScroll,
       onScaleUpdate: _handlePinchUpdate,
       onScaleEnd: (_) => _handlePinchEnd(),
+      onVerticalDragUpdate: (details) {
+        final double sensitivity = 1.5;
+        if (_scrollController.hasClients) {
+          final newOffset = _scrollController.offset - details.delta.dy * sensitivity;
+          _scrollController.jumpTo(
+            newOffset.clamp(
+              0.0,
+              _scrollController.position.maxScrollExtent,
+            ),
+          );
+        }
+      },
       child: SingleChildScrollView(
         controller: _scrollController,
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Text.rich(
-            _parseLyricsWithChords(lyrics),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: _fontSize,
-              height: 1.8,
-              color: _isDarkMode ? Colors.white : Colors.black,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Espacio para evitar que el header tape la primera línea
+              const SizedBox(height: 64), // Ajusta la altura según el header
+              Text.rich(
+                _parseLyricsWithChords(lyrics),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: _fontSize,
+                  height: 1.8,
+                  color: _isDarkMode ? Colors.white : Colors.black,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -563,7 +582,7 @@ class _PresentationModeScreenState extends State<PresentationModeScreen> {
           children: [
             Slider(
               value: _scrollSpeed,
-              min: 0.5,
+              min: 0.1,
               max: 2.0,
               divisions: 6,
               label: _scrollSpeed.toStringAsFixed(1),
