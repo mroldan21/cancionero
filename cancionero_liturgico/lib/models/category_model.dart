@@ -1,23 +1,38 @@
-import 'package:json_annotation/json_annotation.dart';
-
-part 'category_model.g.dart';
-
-@JsonSerializable()
+// ELIMINAR JSON SERIALIZATION TEMPORALMENTE
 class Category {
   final int? id;
   final String name;
   final String color;
-  final int orderIndex;
+  final int order;
   final bool isPredefined;
 
   Category({
     this.id,
     required this.name,
     this.color = "#4CAF50",
-    this.orderIndex = 0,
+    this.order = 0,
     this.isPredefined = false,
   });
 
-  factory Category.fromJson(Map<String, dynamic> json) => _$CategoryFromJson(json);
-  Map<String, dynamic> toJson() => _$CategoryToJson(this);
+  // Convertir a Map para la base de datos
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'color': color,
+      'order_index': order,
+      'is_predefined': isPredefined ? 1 : 0,
+    };
+  }
+
+  // Crear desde Map
+  factory Category.fromJson(Map<String, dynamic> json) {
+    return Category(
+      id: json['id'],
+      name: json['name'],
+      color: json['color'] ?? "#4CAF50",
+      order: json['order_index'] ?? 0,
+      isPredefined: json['is_predefined'] == 1,
+    );
+  }
 }

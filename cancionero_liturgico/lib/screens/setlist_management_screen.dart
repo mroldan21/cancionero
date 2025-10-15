@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/setlist_model.dart';
 import '../models/song.dart';
-import '../screens/presentation_mode_screen.dart';
 import '../services/database_helper.dart';
+import 'presentation_mode_screen.dart';
 
 class SetlistManagementScreen extends StatefulWidget {
   const SetlistManagementScreen({Key? key}) : super(key: key);
@@ -32,26 +32,47 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
     } catch (e) {
       print("Error loading setlists: $e");
       // Show error message to user
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error loading setlists: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading setlists: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
       setState(() {
         _isLoading = false;
       });
     }
   }
-  
-  void _createNewSetlist() {
+
+  void _crearNuevoSetlist() {
     showDialog(
       context: context,
       builder: (context) => SetlistEditDialog(
         onSave: (setlist) async {
-          // TODO: Implement save setlist
-          await _loadSetlists();
+          try {
+            await _dbHelper.insertSetlist(setlist);
+            await _loadSetlists();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Setlist "${setlist.name}" created successfully'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error creating setlist: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
         },
       ),
     );
@@ -79,9 +100,29 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
           ),
           TextButton(
             onPressed: () async {
-              // TODO: Implement delete setlist
-              Navigator.pop(context);
-              await _loadSetlists();
+              try {
+                await _dbHelper.deleteSetlist(setlist.id!);
+                Navigator.pop(context);
+                await _loadSetlists();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Setlist "${setlist.name}" deleted successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                Navigator.pop(context);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error deleting setlist: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
             },
             child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
@@ -98,7 +139,7 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: _createNewSetlist,
+            onPressed: _crearNuevoSetlist,
             tooltip: 'Create New Setlist',
           ),
         ],
@@ -152,7 +193,8 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
         trailing: PopupMenuButton<String>(
           onSelected: (value) {
             if (value == 'edit') {
-              // TODO: Implement edit
+              // TODO: Implement edit setlist functionality
+              _showEditDialog(setlist);
             } else if (value == 'delete') {
               _deleteSetlist(setlist);
             }
@@ -167,15 +209,48 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
     );
   }
 
+  void _showEditDialog(Setlist setlist) {
+    showDialog(
+      context: context,
+      builder: (context) => SetlistEditDialog(
+        setlist: setlist,
+        onSave: (updatedSetlist) async {
+          try {
+            await _dbHelper.updateSetlist(updatedSetlist);
+            await _loadSetlists();
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Setlist "${updatedSetlist.name}" updated successfully'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error updating setlist: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+        },
+      ),
+    );
+  }
+
   String _formatDate(DateTime date) {
     return '${date.day}/${date.month}/${date.year}';
   }
 }
 
 class SetlistEditDialog extends StatefulWidget {
+  final Setlist? setlist;
   final Function(Setlist) onSave;
 
-  const SetlistEditDialog({Key? key, required this.onSave}) : super(key: key);
+  const SetlistEditDialog({Key? key, this.setlist, required this.onSave}) : super(key: key);
 
   @override
   State<SetlistEditDialog> createState() => _SetlistEditDialogState();
@@ -186,6 +261,16 @@ class _SetlistEditDialogState extends State<SetlistEditDialog> {
   final _nameController = TextEditingController();
   final _notesController = TextEditingController();
   DateTime? _selectedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.setlist != null) {
+      _nameController.text = widget.setlist!.name;
+      _notesController.text = widget.setlist!.notes ?? '';
+      _selectedDate = widget.setlist!.eventDate;
+    }
+  }
 
   void _selectDate() async {
     final DateTime? picked = await showDatePicker(
@@ -204,14 +289,13 @@ class _SetlistEditDialogState extends State<SetlistEditDialog> {
   void _saveSetlist() {
     if (_formKey.currentState!.validate()) {
       final setlist = Setlist(
+        id: widget.setlist?.id,
         name: _nameController.text,
         eventDate: _selectedDate,
         notes: _notesController.text.isEmpty ? null : _notesController.text,
-        creationDate: DateTime.now(),
+        creationDate: widget.setlist?.creationDate ?? DateTime.now(),
         modificationDate: DateTime.now(),
       );
-      
-      // Save to database
       widget.onSave(setlist);
       Navigator.pop(context);
     }
@@ -220,7 +304,7 @@ class _SetlistEditDialogState extends State<SetlistEditDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Create New Setlist'),
+      title: Text(widget.setlist == null ? 'Create New Setlist' : 'Edit Setlist'),
       content: Form(
         key: _formKey,
         child: Column(
@@ -288,7 +372,7 @@ class _SetlistEditDialogState extends State<SetlistEditDialog> {
         ),
         ElevatedButton(
           onPressed: _saveSetlist,
-          child: const Text('Create'),
+          child: Text(widget.setlist == null ? 'Create' : 'Update'),
         ),
       ],
     );
@@ -309,6 +393,7 @@ class SetlistDetailScreen extends StatefulWidget {
 }
 
 class _SetlistDetailScreenState extends State<SetlistDetailScreen> {
+  final DatabaseHelper _dbHelper = DatabaseHelper();
   List<Song> _songs = [];
   bool _isLoading = true;
 
@@ -319,43 +404,40 @@ class _SetlistDetailScreenState extends State<SetlistDetailScreen> {
   }
 
   Future<void> _loadSongs() async {
-    // TODO: Load actual songs for this setlist
-    await Future.delayed(const Duration(milliseconds: 500));
-    setState(() {
-      _songs = [
-        Song(
-          id: 1,
-          titulo: "Amazing Grace",
-          autor: "John Newton",
-          letraConAcordes: "    C          G\nAmazing grace how sweet the sound",
-          tonalidadOriginal: "C",
-          tempoBpm: 80,
-          posicionCapo: 0,
-          esFavorita: true,
-          contadorReproducciones: 5,
-          fechaCreacion: DateTime.now(),
-          fechaModificacion: DateTime.now(),
-        ),
-        Song(
-          id: 2,
-          titulo: "How Great Thou Art",
-          autor: "Carl Boberg",
-          letraConAcordes: "    G          D\nThen sings my soul my Savior God to Thee",
-          tonalidadOriginal: "G",
-          tempoBpm: 72,
-          posicionCapo: 0,
-          esFavorita: false,
-          contadorReproducciones: 3,
-          fechaCreacion: DateTime.now(),
-          fechaModificacion: DateTime.now(),
-        ),
-      ];
-      _isLoading = false;
-    });
+    try {
+      _songs = await _dbHelper.getSongsWithDetailsForSetlist(widget.setlist.id!);
+    } catch (e) {
+      print("Error loading setlist songs: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading songs: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   void _addSongsToSetlist() {
-    // TODO: Implement song selection
+    // TODO: Implement song selection dialog
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Add Songs'),
+        content: const Text('Song selection feature coming soon...'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _playSetlist() {
@@ -370,6 +452,13 @@ class _SetlistDetailScreenState extends State<SetlistDetailScreen> {
           ),
         ),
       );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No songs in this setlist to play'),
+          backgroundColor: Colors.orange,
+        ),
+      );
     }
   }
 
@@ -381,7 +470,34 @@ class _SetlistDetailScreenState extends State<SetlistDetailScreen> {
       final Song item = _songs.removeAt(oldIndex);
       _songs.insert(newIndex, item);
     });
+    
     // TODO: Save new order to database
+    // This would require updating all song orders in the setlist_songs table
+  }
+
+  void _removeSongFromSetlist(int songId) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove Song'),
+        content: const Text('Are you sure you want to remove this song from the setlist?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              // TODO: Implement remove song from setlist
+              // await _dbHelper.removeSongFromSetlist(songId);
+              await _loadSongs();
+            },
+            child: const Text('Remove', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -390,11 +506,12 @@ class _SetlistDetailScreenState extends State<SetlistDetailScreen> {
       appBar: AppBar(
         title: Text(widget.setlist.name),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.play_arrow),
-            onPressed: _playSetlist,
-            tooltip: 'Play Setlist',
-          ),
+          if (_songs.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.play_arrow),
+              onPressed: _playSetlist,
+              tooltip: 'Play Setlist',
+            ),
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: _addSongsToSetlist,
@@ -413,18 +530,25 @@ class _SetlistDetailScreenState extends State<SetlistDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   if (widget.setlist.eventDate != null)
-                    Text(
-                      'Event Date: ${_formatDate(widget.setlist.eventDate!)}',
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  if (widget.setlist.notes != null && widget.setlist.notes!.isNotEmpty)
                     Padding(
-                      padding: const EdgeInsets.only(top: 8),
+                      padding: const EdgeInsets.only(bottom: 8),
                       child: Text(
-                        'Notes: ${widget.setlist.notes!}',
-                        style: const TextStyle(fontSize: 14, color: Colors.grey),
+                        'Event Date: ${_formatDate(widget.setlist.eventDate!)}',
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                     ),
+                  if (widget.setlist.notes != null && widget.setlist.notes!.isNotEmpty)
+                    Text(
+                      'Notes: ${widget.setlist.notes!}',
+                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      '${_songs.length} song${_songs.length != 1 ? 's' : ''}',
+                      style: const TextStyle(fontSize: 14, color: Colors.blue),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -433,36 +557,67 @@ class _SetlistDetailScreenState extends State<SetlistDetailScreen> {
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : ReorderableListView.builder(
-                    itemCount: _songs.length,
-                    onReorder: _reorderSongs,
-                    itemBuilder: (context, index) {
-                      final song = _songs[index];
-                      return _buildSongCard(song, index);
-                    },
-                  ),
+                : _songs.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'No songs in this setlist\nTap + to add songs',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                        ),
+                      )
+                    : ReorderableListView.builder(
+                        itemCount: _songs.length,
+                        onReorder: _reorderSongs,
+                        itemBuilder: (context, index) {
+                          final song = _songs[index];
+                          return _buildSongCard(song, index);
+                        },
+                      ),
           ),
         ],
       ),
     );
   }
 
-  // CORREGIR el método _buildSongCard:
   Widget _buildSongCard(Song song, int index) {
     return Card(
-      key: Key('song_${song.id}'),
+      key: Key('song_${song.id}_$index'),
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: ListTile(
         leading: const Icon(Icons.music_note),
         title: Text(
-          song.title, // ← CORREGIDO
+          song.title,
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-        subtitle: song.artist != null ? Text(song.artist!) : null, // ← CORREGIDO
-        trailing: const Icon(Icons.drag_handle),
+        subtitle: song.artist != null ? Text(song.artist!) : null,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.slideshow, size: 20),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => PresentationModeScreen(song: song),
+                  ),
+                );
+              },
+              tooltip: 'Presentation Mode',
+            ),
+            const Icon(Icons.drag_handle, color: Colors.grey),
+          ],
+        ),
         onTap: () {
-          // TODO: Navigate to song details or presentation mode
+          // TODO: Navigate to song details or presentation mode for single song
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PresentationModeScreen(song: song),
+            ),
+          );
         },
+        onLongPress: () => _removeSongFromSetlist(song.id!),
       ),
     );
   }
