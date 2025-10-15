@@ -7,14 +7,14 @@ class Category {
   final int? id;
   final String name;
   final String color;
-  final int order;
+  final int orderIndex;
   final bool isPredefined;
 
   Category({
     this.id,
     required this.name,
     this.color = "#4CAF50",
-    this.order = 0,
+    this.orderIndex = 0,
     this.isPredefined = false,
   });
 

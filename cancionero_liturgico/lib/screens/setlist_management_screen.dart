@@ -378,7 +378,7 @@ class _SetlistDetailScreenState extends State<SetlistDetailScreen> {
       if (newIndex > oldIndex) {
         newIndex -= 1;
       }
-      final Cancion item = _songs.removeAt(oldIndex);
+      final Song item = _songs.removeAt(oldIndex);
       _songs.insert(newIndex, item);
     });
     // TODO: Save new order to database

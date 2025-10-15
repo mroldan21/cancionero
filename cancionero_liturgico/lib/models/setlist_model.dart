@@ -30,7 +30,7 @@ class SetlistSong {
   final int? id;
   final int setlistId;
   final int songId;
-  final int order;
+  final int orderIndex;
   final int transpositionSemitones;
   final int? customCapo;
 
@@ -38,7 +38,7 @@ class SetlistSong {
     this.id,
     required this.setlistId,
     required this.songId,
-    required this.order,
+    required this.orderIndex,
     this.transpositionSemitones = 0,
     this.customCapo,
   });

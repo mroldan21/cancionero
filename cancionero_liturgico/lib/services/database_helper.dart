@@ -1,6 +1,6 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import '../models/cancion_model.dart';
+import '../models/song.dart';
 import '../models/category_model.dart';
 import '../models/setlist_model.dart';
 
@@ -162,11 +162,11 @@ class DatabaseHelper {
 
   // ========== SONG METHODS ==========
 
-  Future<int> insertSong(Cancion song) async {
+  Future<int> insertSong(Song song) async {
     final db = await database;
     return await db.insert('songs', {
-      'title': song.titulo,
-      'author': song.autor,
+      'title': song.title,
+      'author': song.artist,
       'lyrics_with_chords': song.letraConAcordes,
       'original_key': song.tonalidadOriginal,
       'tempo_bpm': song.tempoBpm,
@@ -180,12 +180,12 @@ class DatabaseHelper {
     });
   }
 
-  Future<List<Cancion>> getSongs() async {
+  Future<List<Song>> getSongs() async {
     final db = await database;
     final List<Map<String, dynamic>> maps = await db.query('songs', orderBy: 'title');
     
     return List.generate(maps.length, (i) {
-      return Cancion(
+      return Song(
         id: maps[i]['id'],
         titulo: maps[i]['title'],
         autor: maps[i]['author'],
@@ -205,7 +205,7 @@ class DatabaseHelper {
     });
   }
 
-  Future<int> updateSong(Cancion song) async {
+  Future<int> updateSong(Song song) async {
     final db = await database;
     return await db.update(
       'songs',
