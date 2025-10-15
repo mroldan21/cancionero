@@ -217,14 +217,13 @@ class SongItem extends StatelessWidget {
   // }
 
   Widget _buildSongTrailing(BuildContext context) {
-    return const SizedBox(
-      width: 48, // ✅ ANCHO MÍNIMO ABSOLUTO
-      height: 48, // ✅ ALTO FIJO
-      child: Icon(
-        Icons.more_vert, 
-        size: 20,
-        color: Colors.grey,
-      ),
+    return IconButton(
+      icon: const Icon(Icons.slideshow, size: 40),
+      onPressed: () => _handlePresentationMode(context),
+      tooltip: 'Presentation Mode',
+      color: Colors.blue,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
     );
   }
 }
