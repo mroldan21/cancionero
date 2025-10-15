@@ -1,5 +1,7 @@
 import '../models/song.dart';
 import 'database_helper.dart';
+// AGREGAR el import faltante
+import '../models/setlist_model.dart';
 
 class SongRepository {
   final DatabaseHelper _databaseHelper = DatabaseHelper();
@@ -433,4 +435,53 @@ Firm through the fiercest drought and storm""",
     songs.sort((a, b) => b.creationDate.compareTo(a.creationDate));
     return songs.take(limit).toList();
   }
+
+  // AGREGAR este método para inicializar setlists demo
+  Future<void> initializeSetlistsDemoData() async {
+    try {
+      final dbHelper = DatabaseHelper();
+      final existingSetlists = await dbHelper.getSetlists();
+      
+      if (existingSetlists.isEmpty) {
+        print('🔄 Inicializando setlists demo...');
+        
+        // Crear setlists demo
+        final demoSetlists = [
+          Setlist(
+            name: "Misa Dominical",
+            eventDate: DateTime(2024, 2, 4),
+            notes: "Misa de 10:00 AM",
+            creationDate: DateTime.now(),
+            modificationDate: DateTime.now(),
+          ),
+          Setlist(
+            name: "Navidad 2024", 
+            eventDate: DateTime(2024, 12, 24),
+            notes: "Misa de Nochebuena",
+            creationDate: DateTime.now(),
+            modificationDate: DateTime.now(),
+          ),
+          Setlist(
+            name: "Bautismo Juan Pérez",
+            eventDate: DateTime(2024, 3, 15),
+            notes: "Ceremonia de bautismo",
+            creationDate: DateTime.now(), 
+            modificationDate: DateTime.now(),
+          ),
+        ];
+        
+        for (final setlist in demoSetlists) {
+          await dbHelper.insertSetlist(setlist);
+        }
+        
+        print('✅ Setlists demo inicializados: ${demoSetlists.length} setlists');
+      } else {
+        print('✅ Ya existen ${existingSetlists.length} setlists');
+      }
+    } catch (e) {
+      print('❌ Error inicializando setlists demo: $e');
+    }
+  }
+
+
 }

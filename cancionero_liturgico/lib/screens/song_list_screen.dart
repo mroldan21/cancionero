@@ -4,6 +4,8 @@ import '../models/song.dart';
 import '../services/database_helper.dart';
 import 'song_edit_screen.dart';
 import 'presentation_mode_screen.dart';
+import '../services/song_repository.dart'; // ✅ IMPORTAR SongRepository
+import '../widgets/song_item.dart';
 
 class SongListScreen extends StatefulWidget {
   const SongListScreen({Key? key}) : super(key: key);
@@ -14,6 +16,7 @@ class SongListScreen extends StatefulWidget {
 
 class _SongListScreenState extends State<SongListScreen> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
+  final SongRepository _songRepository = SongRepository(); // ✅ INSTANCIAR Repository
   List<Song> _songs = [];
   List<Song> _filteredSongs = [];
   bool _isLoading = true;
@@ -85,6 +88,17 @@ class _SongListScreenState extends State<SongListScreen> {
     ).then((_) => _loadSongs());
   }
 
+  // ✅ CORREGIDO: Método _toggleFavorite correctamente implementado
+  void _toggleFavorite(Song song) async {
+    try {
+      await _songRepository.toggleFavorite(song.id!);
+      await _loadSongs(); // Recargar para ver el cambio
+    } catch (e) {
+      print("Error toggling favorite: $e");
+    }
+  }
+
+  
   void _deleteSong(Song song) {
     showDialog(
       context: context,
@@ -196,7 +210,13 @@ class _SongListScreenState extends State<SongListScreen> {
                         itemCount: _filteredSongs.length,
                         itemBuilder: (context, index) {
                           final song = _filteredSongs[index];
-                          return _buildSongCard(song);
+                          return SongItem(
+                            song: song,
+                            onTap: () => _editSong(song),
+                            onEdit: () => _editSong(song),
+                            onToggleFavorite: () => _toggleFavorite(song), // ✅ CORREGIDO
+                            onDelete: () => _deleteSong(song), // ✅ CORREGIDO
+                          );
                         },
                       ),
           ),

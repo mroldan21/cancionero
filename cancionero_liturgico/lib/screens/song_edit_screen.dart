@@ -107,6 +107,13 @@ class _SongEditScreenState extends State<SongEditScreen> {
     }
   }
 
+  // ✅ NUEVO MÉTODO: Toggle favorito explícito
+  void _toggleFavorite() {
+    setState(() {
+      _isFavorite = !_isFavorite;
+    });
+  }  
+
   void _openPresentationMode() {
     if (_formKey.currentState!.validate()) {
       // Create a temporary song object with current form data for presentation
@@ -146,14 +153,13 @@ class _SongEditScreenState extends State<SongEditScreen> {
               onPressed: _openPresentationMode,
               tooltip: 'Presentation Mode',
             ),
-          // Favorite Toggle
+          // ✅ BOTÓN DE FAVORITO MEJORADO
           IconButton(
-            icon: Icon(_isFavorite ? Icons.favorite : Icons.favorite_border),
-            onPressed: () {
-              setState(() {
-                _isFavorite = !_isFavorite;
-              });
-            },
+            icon: Icon(
+              _isFavorite ? Icons.favorite : Icons.favorite_border,
+              color: _isFavorite ? Colors.red : null,
+            ),
+            onPressed: _toggleFavorite, // ✅ LLAMAR AL MÉTODO ESPECÍFICO
             tooltip: _isFavorite ? 'Remove from favorites' : 'Add to favorites',
           ),
         ],
@@ -273,6 +279,32 @@ class _SongEditScreenState extends State<SongEditScreen> {
                       ),
                       maxLines: 3,
                     ),
+                    // ✅ INDICADOR VISUAL DE FAVORITO
+                    if (isEditing) ...[
+                      const SizedBox(height: 16),
+                      Card(
+                        color: _isFavorite ? Colors.red[50] : Colors.grey[50],
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.favorite,
+                                color: _isFavorite ? Colors.red : Colors.grey,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                _isFavorite ? 'This song is in favorites' : 'Not in favorites',
+                                style: TextStyle(
+                                  color: _isFavorite ? Colors.red : Colors.grey,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],                    
                   ],
                 ),
               ),
