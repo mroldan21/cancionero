@@ -1,15 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';  // ← CON package:
-import 'services/song_provider.dart';     // ← SIN ../ (misma carpeta)
-import 'app.dart';                        // ← SIN ../
+import 'screens/main_navigation_screen.dart';
 
 void main() {
-  runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (context) => SongProvider()),
-      ],
-      child: const CancioneroLiturgicoApp(),
-    ),
-  );
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Cancionero Litúrgico',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        visualDensity: VisualDensity.adaptivePlatformDensity,
+        useMaterial3: true,
+      ),
+      home: const MainNavigationScreen(),
+      debugShowCheckedModeBanner: false,
+    );
+  }
 }

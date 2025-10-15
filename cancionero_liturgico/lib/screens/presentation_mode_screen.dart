@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../models/cancion_model.dart';
+import '../models/song.dart';
 import '../services/transposition_service.dart';
 
 class PresentationModeScreen extends StatefulWidget {
-  final Cancion song;
-  final List<Cancion>? setlistSongs;
+  final Song song;
+  final List<Song>? setlistSongs;
   final int initialIndex;
 
   const PresentationModeScreen({
@@ -83,10 +83,10 @@ class _PresentationModeScreenState extends State<PresentationModeScreen> {
 
   String _getTransposedLyrics() {
     if (_currentTransposition == 0) {
-      return widget.song.letraConAcordes;
+      return widget.song.lyricsWithChords;
     }
     
-    return _transposeLyrics(widget.song.letraConAcordes, _currentTransposition);
+    return _transposeLyrics(widget.song.lyricsWithChords, _currentTransposition);
   }
 
   String _transposeLyrics(String lyrics, int semitones) {
@@ -182,7 +182,7 @@ class _PresentationModeScreenState extends State<PresentationModeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.song.titulo,
+                  widget.song.title,
                   style: TextStyle(
                     color: _isDarkMode ? Colors.white : Colors.black,
                     fontSize: 20,
@@ -193,7 +193,7 @@ class _PresentationModeScreenState extends State<PresentationModeScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Key: ${widget.song.tonalidadOriginal} • '
+                  'Key: ${widget.song.originalKey} • '
                   'Capo: $_currentCapo • '
                   'Transpose: ${_currentTransposition > 0 ? '+' : ''}$_currentTransposition',
                   style: TextStyle(
