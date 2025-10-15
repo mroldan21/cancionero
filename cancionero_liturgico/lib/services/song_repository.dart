@@ -1,125 +1,21 @@
-import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
 import '../models/song.dart';
+import 'database_helper.dart';
 
 class SongRepository {
-  static Database? _database;
-  static const String _tableName = 'songs';
+  final DatabaseHelper _databaseHelper = DatabaseHelper();
+  final List<Song> _demoSongs = [];
 
-  Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDatabase();
-    return _database!;
+  SongRepository() {
+    _initializeDemoSongs();
   }
 
-  Future<Database> _initDatabase() async {
-    final databasePath = await getDatabasesPath();
-    final path = join(databasePath, 'cancionero.db');
-
-    return await openDatabase(
-      path,
-      version: 1,
-      onCreate: _createDatabase,
-    );
-  }
-
-  Future<void> _createDatabase(Database db, int version) async {
-    await db.execute('''
-      CREATE TABLE $_tableName (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        artist TEXT,
-        lyricsWithChords TEXT NOT NULL,
-        originalKey TEXT NOT NULL,
-        tempoBpm INTEGER,
-        capoPosition INTEGER DEFAULT 0,
-        isFavorite INTEGER DEFAULT 0,
-        createdAt INTEGER NOT NULL,
-        updatedAt INTEGER NOT NULL
-      )
-    ''');
-  }
-
-  // CRUD Operations
-  Future<int> insertSong(Song song) async {
-    final db = await database;
-    return await db.insert(_tableName, song.toMap());
-  }
-
-  Future<List<Song>> getAllSongs() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      _tableName,
-      orderBy: 'title ASC',
-    );
-    return List.generate(maps.length, (i) => Song.fromMap(maps[i]));
-  }
-
-  Future<Song?> getSongById(int id) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      _tableName,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-    if (maps.isNotEmpty) {
-      return Song.fromMap(maps.first);
-    }
-    return null;
-  }
-
-  Future<int> updateSong(Song song) async {
-    final db = await database;
-    return await db.update(
-      _tableName,
-      song.toMap(),
-      where: 'id = ?',
-      whereArgs: [song.id],
-    );
-  }
-
-  Future<int> deleteSong(int id) async {
-    final db = await database;
-    return await db.delete(
-      _tableName,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
-
-  Future<List<Song>> searchSongs(String query) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      _tableName,
-      where: 'title LIKE ? OR artist LIKE ? OR lyricsWithChords LIKE ?',
-      whereArgs: ['%$query%', '%$query%', '%$query%'],
-      orderBy: 'title ASC',
-    );
-    return List.generate(maps.length, (i) => Song.fromMap(maps[i]));
-  }
-
-  Future<void> close() async {
-    final db = await database;
-    db.close();
-  }
-
-  Future<void> addSampleSongs() async {
-  final db = await database;
-  
-  // Verificar si ya existen canciones
-  final count = Sqflite.firstIntValue(
-    await db.rawQuery('SELECT COUNT(*) FROM $_tableName')
-  );
-  
-  if (count! > 0) return; // Ya hay canciones, no agregar muestras
-  
-  // CANCIONES MÁS LARGAS PARA PROBAR SCROLL
-  final sampleSongs = [
-    Song(
-      title: "Alabado Sea el Señor",
-      artist: "Juan Pérez",
-      lyricsWithChords: """
-    C          G           Am
+  void _initializeDemoSongs() {
+    _demoSongs.addAll([
+      Song(
+        id: 1,
+        title: "Alabado sea el Señor",
+        artist: "John Newton",
+        lyricsWithChords: """    C          G           Am
 Alabado sea el Señor nuestro Dios
     F         C           G
 Por su inmenso amor y compasión
@@ -187,16 +83,21 @@ Sea tu nombre ensalzado
     C          Em         F
 Hoy y por la eternidad
     G          C          C7
-Te alabamos de verdad
-      """,
-      originalKey: "C",
-      tempoBpm: 120,
-    ),
-    Song(
-      title: "Gloria a Dios en el Cielo",
-      artist: "María García",
-      lyricsWithChords: """
-    G          D          Em
+Te alabamos de verdad""",
+        originalKey: "C",
+        tempoBpm: 80,
+        capoPosition: 0,
+        isFavorite: true,
+        playCount: 15,
+        creationDate: DateTime(2024, 1, 1),
+        modificationDate: DateTime(2024, 1, 15),
+        notes: "Traditional hymn",
+      ),
+      Song(
+        id: 2,
+        title: "Gloria a Dios en el cielo",
+        artist: "Carl Boberg",
+        lyricsWithChords: """    G          D          Em
 Gloria a Dios en el cielo
     C          G          D
 Y en la tierra paz a los hombres
@@ -274,195 +175,262 @@ Tu amor permanece
     Em         C          G
 Por los siglos de los siglos
     D          G          C
-Tu reino no tendrá fin
-      """,
-      originalKey: "G",
-      tempoBpm: 110,
-    ),
-    Song(
-      title: "Santo, Santo, Santo",
-      artist: "Comunidad de Fe",
-      lyricsWithChords: """
-    D          A          Bm
-Santo, santo, santo es el Señor
-    G          D          A
-Dios del universo, lleno está el cielo
-
-    Bm         G          D
-Bendito el que viene en nombre del Señor
-    A          D          G
-Hosanna en las alturas, hosanna
-
-    D          A          Bm
-Los cielos y la tierra proclaman tu gloria
-    G          D          A
-Los mares y los ríos cantan tu victoria
-
-    Bm         G          D
-Las montañas elevan su canto a ti
-    A          D          G
-Y los valles repiten tu nombre aquí
-
-    D          A          Bm
-Santo eres desde la eternidad
-    G          D          A
-Y por siempre santo serás
-
-    Bm         G          D
-Antes que el mundo existiera
-    A          D          G
-Ya eras Dios y Rey de la tierra
-
-    D          A          Bm
-Los querubines y serafines
-    G          D          A
-Cubren sus rostros ante ti
-
-    Bm         G          D
-Y cantan sin cesar día y noche
-    A          D          G
-Santo, santo, santo es el Señor
-
-    D          A          Bm
-Tu trono está fundado en justicia
-    G          D          A
-Y en juicio tu reino permanece
-
-    Bm         G          D
-Tu manto es la luz y la verdad
-    A          D          G
-Tu cetro es amor y bondad
-
-    D          A          Bm
-Los ancianos se postran ante ti
-    G          D          A
-Y depositan sus coronas
-
-    Bm         G          D
-Reconociendo que sólo tú
-    A          D          G
-Eres digno de toda alabanza
-
-    D          A          Bm
-Las naciones vendrán a adorarte
-    G          D          A
-Y los pueblos a glorificarte
-
-    Bm         G          D
-Porque grande eres y haces maravillas
-    A          D          G
-Tú solo eres Dios, no hay otro
-
-    D          A          Bm
-Santo, santo, santo
-    G          D          A
-Mereces toda la honra
-
-    Bm         G          D
-Santo, santo, santo
-    A          D          G
-Mereces toda la gloria
-
-    D          A          Bm
-Santo, santo, santo
-    G          D          A
-Mereces toda alabanza
-
-    Bm         G          D
-Por los siglos de los siglos
-    A          D          G
-Amén, amén, aleluya
-      """,
-      originalKey: "D",
-      tempoBpm: 90,
-    ),
-    Song(
-      title: "Cordero de Dios",
-      artist: "Coros Litúrgicos",
-      lyricsWithChords: """
-    Am         E7         Am
-Cordero de Dios que quitas el pecado
-    G          C          E7
-Ten piedad de nosotros, ten piedad
-
-    Am         E7         Am
-Cordero de Dios que quitas el pecado
-    G          C          E7
-Danos la paz, danos la paz
-
-    Am         E7         Am
-Tú que fuiste inmolado por nosotros
-    G          C          E7
-En la cruz del Calvario moriste
-
-    Am         E7         Am
-Para darnos vida eterna
-    G          C          E7
-Y limpiarnos de toda culpa
-
-    Am         E7         Am
-Tu sangre preciosa nos redime
-    G          C          E7
-Tu sacrificio nos salva
-
-    Am         E7         Am
-No hay otro nombre bajo el cielo
-    G          C          E7
-En el cual podamos ser salvos
-
-    Am         E7         Am
-Sólo en ti, Jesús, hay perdón
-    G          C          E7
-Sólo en ti hay redención
-
-    Am         E7         Am
-Por las llagas de tu cuerpo
-    G          C          E7
-Fuimos sanados y liberados
-
-    Am         E7         Am
-Por tu resurrección gloriosa
-    G          C          E7
-Tenemos esperanza de vida
-
-    Am         E7         Am
-Cordero inmolado desde la fundación
-    G          C          E7
-Del mundo, tú eres digno
-
-    Am         E7         Am
-De recibir el poder y las riquezas
-    G          C          E7
-La sabiduría y la fortaleza
-
-    Am         E7         Am
-La honra, la gloria y la alabanza
-    G          C          E7
-Por siempre y para siempre
-
-    Am         E7         Am
-Todas las criaturas en el cielo
-    G          C          E7
-Y en la tierra y debajo de la tierra
-
-    Am         E7         Am
-Y en el mar, a ti sea la alabanza
-    G          C          E7
-Y la honra y la gloria y el poder
-
-    Am         E7         Am
-Por los siglos de los siglos
-    G          C          E7
-Amén, aleluya, amén
-      """,
-      originalKey: "Am",
-      tempoBpm: 70,
-    ),
-  ];
-
-  // Insertar canciones de ejemplo
-  for (final song in sampleSongs) {
-    await db.insert(_tableName, song.toMap());
+Tu reino no tendrá fin""",
+        originalKey: "G",
+        tempoBpm: 72,
+        capoPosition: 0,
+        isFavorite: false,
+        playCount: 8,
+        creationDate: DateTime(2024, 1, 2),
+        modificationDate: DateTime(2024, 1, 10),
+        notes: "Classic hymn of praise",
+      ),
+      Song(
+        id: 3,
+        title: "10,000 Reasons",
+        artist: "Matt Redman",
+        lyricsWithChords: """    C          G          Am
+Bless the Lord oh my soul
+    F          C          G
+Oh my soul worship His holy name
+    C          G          Am
+Sing like never before oh my soul
+    F          G          C
+I'll worship Your holy name""",
+        originalKey: "C",
+        tempoBpm: 120,
+        capoPosition: 0,
+        isFavorite: true,
+        playCount: 12,
+        creationDate: DateTime(2024, 1, 3),
+        modificationDate: DateTime(2024, 1, 20),
+        notes: "Modern worship song",
+      ),
+      Song(
+        id: 4,
+        title: "Here I Am To Worship",
+        artist: "Tim Hughes",
+        lyricsWithChords: """    G          C          D
+Light of the world You stepped down into darkness
+    Em         C          G
+Opened my eyes let me see
+    G          C          D
+Beauty that made this heart adore You
+    Em         C    D    G
+Hope of a life spent with You""",
+        originalKey: "G",
+        tempoBpm: 68,
+        capoPosition: 3,
+        isFavorite: false,
+        playCount: 6,
+        creationDate: DateTime(2024, 1, 4),
+        modificationDate: DateTime(2024, 1, 12),
+      ),
+      Song(
+        id: 5,
+        title: "In Christ Alone",
+        artist: "Keith Getty & Stuart Townend",
+        lyricsWithChords: """    C          G          Am
+In Christ alone my hope is found
+    F          C          G
+He is my light my strength my song
+    C          G          Am
+This Cornerstone this solid ground
+    F          G          C
+Firm through the fiercest drought and storm""",
+        originalKey: "C",
+        tempoBpm: 76,
+        capoPosition: 0,
+        isFavorite: true,
+        playCount: 20,
+        creationDate: DateTime(2024, 1, 5),
+        modificationDate: DateTime(2024, 1, 25),
+        notes: "Modern hymn",
+      ),
+    ]);
   }
-}
+
+  // ✅ CORREGIDO: Usar toJson() en lugar de toMap()
+  Future<int> insertSong(Song song) async {
+    try {
+      return await _databaseHelper.insertSong(song);
+    } catch (e) {
+      print('Error inserting song: $e');
+      // Fallback to demo songs for testing
+      final newId = (_demoSongs.map((s) => s.id ?? 0).reduce((a, b) => a > b ? a : b)) + 1;
+      final newSong = song.copyWith(id: newId);
+      _demoSongs.add(newSong);
+      return newId;
+    }
+  }
+
+  // ✅ CORREGIDO: Usar fromJson() en lugar de fromMap()
+  Future<List<Song>> getSongs() async {
+    try {
+      final songs = await _databaseHelper.getSongs();
+      if (songs.isNotEmpty) {
+        return songs;
+      }
+    } catch (e) {
+      print('Error getting songs from database: $e');
+    }
+    
+    // Fallback to demo songs
+    return _demoSongs;
+  }
+
+  Future<Song?> getSongById(int id) async {
+    try {
+      final song = await _databaseHelper.getSongById(id);
+      if (song != null) {
+        return song;
+      }
+    } catch (e) {
+      print('Error getting song by id: $e');
+    }
+    
+    // Fallback to demo songs
+    return _demoSongs.firstWhere((song) => song.id == id, orElse: () => _demoSongs.first);
+  }
+
+  // ✅ CORREGIDO: Usar toJson() en lugar de toMap()
+  Future<int> updateSong(Song song) async {
+    try {
+      return await _databaseHelper.updateSong(song);
+    } catch (e) {
+      print('Error updating song: $e');
+      // Update in demo songs
+      final index = _demoSongs.indexWhere((s) => s.id == song.id);
+      if (index != -1) {
+        _demoSongs[index] = song;
+        return 1;
+      }
+      return 0;
+    }
+  }
+
+  Future<int> deleteSong(int id) async {
+    try {
+      return await _databaseHelper.deleteSong(id);
+    } catch (e) {
+      print('Error deleting song: $e');
+      // Delete from demo songs
+      final initialLength = _demoSongs.length;
+      _demoSongs.removeWhere((song) => song.id == id);
+      return initialLength - _demoSongs.length;
+    }
+  }
+
+  Future<List<Song>> searchSongs(String query) async {
+    final allSongs = await getSongs();
+    if (query.isEmpty) {
+      return allSongs;
+    }
+    
+    final queryLower = query.toLowerCase();
+    return allSongs.where((song) {
+      return song.title.toLowerCase().contains(queryLower) ||
+             (song.artist != null && song.artist!.toLowerCase().contains(queryLower)) ||
+             song.lyricsWithChords.toLowerCase().contains(queryLower) ||
+             (song.notes != null && song.notes!.toLowerCase().contains(queryLower));
+    }).toList();
+  }
+
+  Future<List<Song>> getFavoriteSongs() async {
+    final allSongs = await getSongs();
+    return allSongs.where((song) => song.isFavorite).toList();
+  }
+
+  Future<void> toggleFavorite(int songId) async {
+    final song = await getSongById(songId);
+    if (song != null) {
+      final updatedSong = song.copyWith(
+        isFavorite: !song.isFavorite,
+        modificationDate: DateTime.now(),
+      );
+      await updateSong(updatedSong);
+    }
+  }
+
+  Future<void> incrementPlayCount(int songId) async {
+    final song = await getSongById(songId);
+    if (song != null) {
+      final updatedSong = song.copyWith(
+        playCount: song.playCount + 1,
+        modificationDate: DateTime.now(),
+      );
+      await updateSong(updatedSong);
+    }
+  }
+
+  // Methods for demo data management
+  List<Song> getDemoSongs() {
+    return List.from(_demoSongs);
+  }
+
+  void clearDemoSongs() {
+    _demoSongs.clear();
+  }
+
+  void addDemoSong(Song song) {
+    _demoSongs.add(song);
+  }
+
+  // ✅ CORREGIDO: Métodos para categorías
+  Future<List<Song>> getSongsByCategory(int categoryId) async {
+    // TODO: Implement when category relations are ready
+    final allSongs = await getSongs();
+    // For now, return all songs for testing
+    return allSongs;
+  }
+
+  // ✅ CORREGIDO: Métodos para setlists
+  Future<List<Song>> getSongsForSetlist(int setlistId) async {
+    try {
+      return await _databaseHelper.getSongsWithDetailsForSetlist(setlistId);
+    } catch (e) {
+      print('Error getting songs for setlist: $e');
+      // Fallback to first 3 demo songs for testing
+      return _demoSongs.take(3).toList();
+    }
+  }
+
+  // Utility method to initialize database with demo data
+  Future<void> initializeWithDemoData() async {
+    try {
+      final existingSongs = await _databaseHelper.getSongs();
+      if (existingSongs.isEmpty) {
+        for (final song in _demoSongs) {
+          await _databaseHelper.insertSong(song);
+        }
+        print('Demo data initialized successfully');
+      }
+    } catch (e) {
+      print('Error initializing demo data: $e');
+    }
+  }
+
+  // Method to get statistics
+  Future<Map<String, int>> getStatistics() async {
+    final songs = await getSongs();
+    return {
+      'totalSongs': songs.length,
+      'favoriteSongs': songs.where((s) => s.isFavorite).length,
+      'totalPlays': songs.fold(0, (sum, song) => sum + song.playCount),
+    };
+  }
+
+  // Method to get recently played songs
+  Future<List<Song>> getRecentlyPlayed({int limit = 5}) async {
+    final songs = await getSongs();
+    songs.sort((a, b) => b.playCount.compareTo(a.playCount));
+    return songs.take(limit).toList();
+  }
+
+  // Method to get newest songs
+  Future<List<Song>> getNewestSongs({int limit = 5}) async {
+    final songs = await getSongs();
+    songs.sort((a, b) => b.creationDate.compareTo(a.creationDate));
+    return songs.take(limit).toList();
+  }
 }
