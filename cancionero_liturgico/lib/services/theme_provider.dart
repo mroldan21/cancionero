@@ -1,46 +1,55 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // Asegúrate de agregar shared_preferences al pubspec.yaml
 
 class ThemeProvider with ChangeNotifier {
-  ThemeMode _themeMode = ThemeMode.light;
+  static const String _themeKey = 'theme_preference'; // Clave para SharedPreferences
+  bool _isDarkMode = false;
 
-  ThemeMode get themeMode => _themeMode;
+  bool get isDarkMode => _isDarkMode;
 
-  void setThemeMode(ThemeMode mode) {
-    _themeMode = mode;
+  ThemeData get currentTheme => _isDarkMode ? _darkTheme : _lightTheme;
+
+  static final ThemeData _lightTheme = ThemeData(
+    useMaterial3: true,
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: Colors.blue,
+      brightness: Brightness.light,
+    ),
+  );
+
+  static final ThemeData _darkTheme = ThemeData(
+    useMaterial3: true,
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: Colors.blue,
+      brightness: Brightness.dark,
+    ),
+  );
+
+  ThemeProvider() {
+    _loadTheme();
+  }
+
+  Future<void> _loadTheme() async {
+    final prefs = await SharedPreferences.getInstance();
+    final themeString = prefs.getString(_themeKey) ?? 'light'; // Valor por defecto
+    _isDarkMode = (themeString == 'dark');
     notifyListeners();
   }
 
-  void toggleTheme() {
-    _themeMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
+  Future<void> toggleTheme() async {
+    _isDarkMode = !_isDarkMode;
+    await _saveTheme();
     notifyListeners();
   }
 
-  // Temas personalizados
-  static ThemeData get lightTheme {
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: Colors.deepPurple,
-        brightness: Brightness.light,
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-      ),
-    );
+  Future<void> _saveTheme() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_themeKey, _isDarkMode ? 'dark' : 'light');
   }
 
-  static ThemeData get darkTheme {
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: Colors.deepPurple,
-        brightness: Brightness.dark,
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
-      ),
-    );
+  // Nuevo método para forzar la carga del tema desde SharedPreferences
+  Future<void> reloadTheme() async {
+    await _loadTheme();
   }
 }

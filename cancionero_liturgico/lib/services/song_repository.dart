@@ -1,487 +1,330 @@
-import '../models/song.dart';
-import 'database_helper.dart';
-// AGREGAR el import faltante
-import '../models/setlist_model.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:cancionero_liturgico/models/song.dart';
+import 'package:cancionero_liturgico/models/setlist_model.dart';
+import 'package:cancionero_liturgico/models/setlist.dart'; // Importa SetlistItem
+import 'package:cancionero_liturgico/services/database_helper.dart';
 
 class SongRepository {
   final DatabaseHelper _databaseHelper = DatabaseHelper();
-  final List<Song> _demoSongs = [];
 
-  SongRepository() {
-    _initializeDemoSongs();
-  }
+  // --- CRUD Canciones ---
+  Future<List<Song>> getAllSongs() async {
+    final db = await _databaseHelper.database;
+    // Consulta para obtener todas las canciones con sus categorías
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT s.*, GROUP_CONCAT(cc.categoria_id) as categoria_ids
+      FROM songs s
+      LEFT JOIN cancion_categoria cc ON s.id = cc.cancion_id
+      GROUP BY s.id
+    ''');
 
-  void _initializeDemoSongs() {
-    _demoSongs.addAll([
-      Song(
-        id: 1,
-        title: "Alabado sea el Señor",
-        artist: "John Newton",
-        lyricsWithChords: """    C          G           Am
-Alabado sea el Señor nuestro Dios
-    F         C           G
-Por su inmenso amor y compasión
-
-    C          Em         F
-Gloria al Padre, gloria al Hijo
-    G          C          G
-Y gloria al Espíritu Santo
-
-    Am        Em         F
-Te damos gracias por tu gran bondad
-    C          G          C
-Por tu misericordia y tu verdad
-
-    F         C          G
-Cantamos con alegría y devoción
-    Am        F          G
-Elevamos nuestras voces en oración
-
-    C          G           Am
-En la mañana al despertar
-    F         C           G
-Tu nombre quiero glorificar
-
-    C          Em         F
-En el trabajo y en el descanso
-    G          C          G
-Tu presencia es mi regalo
-
-    Am        Em         F
-En los momentos de dificultad
-    C          G          C
-Eres mi fuerza y mi bondad
-
-    F         C          G
-Cuando la noche llega al final
-    Am        F          G
-Contigo quiero caminar
-
-    C          G           Am
-Las aves cantan tu loor
-    F         C           G
-Las flores muestran tu color
-
-    C          Em         F
-Los ríos fluyen hacia el mar
-    G          C          G
-Todo te quiere alabar
-
-    Am        Em         F
-Las montañas altas y el valle
-    C          G          C
-Proclaman que tú eres grande
-
-    F         C          G
-El sol, la luna y las estrellas
-    Am        F          G
-Cuentan tus obras tan bellas
-
-    C          G           Am
-Por todo lo que has creado
-    F         C           G
-Sea tu nombre ensalzado
-
-    C          Em         F
-Hoy y por la eternidad
-    G          C          C7
-Te alabamos de verdad""",
-        originalKey: "C",
-        tempoBpm: 80,
-        capoPosition: 0,
-        isFavorite: true,
-        playCount: 15,
-        creationDate: DateTime(2024, 1, 1),
-        modificationDate: DateTime(2024, 1, 15),
-        notes: "Traditional hymn",
-      ),
-      Song(
-        id: 2,
-        title: "Gloria a Dios en el cielo",
-        artist: "Carl Boberg",
-        lyricsWithChords: """    G          D          Em
-Gloria a Dios en el cielo
-    C          G          D
-Y en la tierra paz a los hombres
-
-    Em         C          G
-Te alabamos, te bendecimos
-    D          G          C
-Te adoramos, te glorificamos
-
-    G          D          Em
-Por tu inmensa gloria te damos gracias
-    C          G          D
-Señor Dios, Rey celestial
-
-    Em         C          G
-Dios Padre todopoderoso
-    D          G          C
-Señor, Hijo único, Jesucristo
-
-    G          D          Em
-Señor Dios, Cordero de Dios
-    C          G          D
-Hijo del Padre
-
-    Em         C          G
-Tú que quitas el pecado del mundo
-    D          G          C
-Ten piedad de nosotros
-
-    G          D          Em
-Tú que quitas el pecado del mundo
-    C          G          D
-Atiende nuestra súplica
-
-    Em         C          G
-Tú que estás a la derecha del Padre
-    D          G          C
-Ten piedad de nosotros
-
-    G          D          Em
-Porque sólo tú eres Santo
-    C          G          D
-Sólo tú Señor
-
-    Em         C          G
-Sólo tú Altísimo, Jesucristo
-    D          G          C
-Con el Espíritu Santo
-
-    G          D          Em
-En la gloria de Dios Padre
-    C          G          D
-Amén, amén, aleluya
-
-    Em         C          G
-Los ángeles cantan tu gloria
-    D          G          C
-Los santos te adoran
-
-    G          D          Em
-Los mártires proclaman tu nombre
-    C          G          D
-La iglesia te venera
-
-    Em         C          G
-Desde el oriente hasta el occidente
-    D          G          C
-Tu nombre es alabado
-
-    G          D          Em
-De generación en generación
-    C          G          D
-Tu amor permanece
-
-    Em         C          G
-Por los siglos de los siglos
-    D          G          C
-Tu reino no tendrá fin""",
-        originalKey: "G",
-        tempoBpm: 72,
-        capoPosition: 0,
-        isFavorite: false,
-        playCount: 8,
-        creationDate: DateTime(2024, 1, 2),
-        modificationDate: DateTime(2024, 1, 10),
-        notes: "Classic hymn of praise",
-      ),
-      Song(
-        id: 3,
-        title: "10,000 Reasons",
-        artist: "Matt Redman",
-        lyricsWithChords: """    C          G          Am
-Bless the Lord oh my soul
-    F          C          G
-Oh my soul worship His holy name
-    C          G          Am
-Sing like never before oh my soul
-    F          G          C
-I'll worship Your holy name""",
-        originalKey: "C",
-        tempoBpm: 120,
-        capoPosition: 0,
-        isFavorite: true,
-        playCount: 12,
-        creationDate: DateTime(2024, 1, 3),
-        modificationDate: DateTime(2024, 1, 20),
-        notes: "Modern worship song",
-      ),
-      Song(
-        id: 4,
-        title: "Here I Am To Worship",
-        artist: "Tim Hughes",
-        lyricsWithChords: """    G          C          D
-Light of the world You stepped down into darkness
-    Em         C          G
-Opened my eyes let me see
-    G          C          D
-Beauty that made this heart adore You
-    Em         C    D    G
-Hope of a life spent with You""",
-        originalKey: "G",
-        tempoBpm: 68,
-        capoPosition: 3,
-        isFavorite: false,
-        playCount: 6,
-        creationDate: DateTime(2024, 1, 4),
-        modificationDate: DateTime(2024, 1, 12),
-      ),
-      Song(
-        id: 5,
-        title: "In Christ Alone",
-        artist: "Keith Getty & Stuart Townend",
-        lyricsWithChords: """    C          G          Am
-In Christ alone my hope is found
-    F          C          G
-He is my light my strength my song
-    C          G          Am
-This Cornerstone this solid ground
-    F          G          C
-Firm through the fiercest drought and storm""",
-        originalKey: "C",
-        tempoBpm: 76,
-        capoPosition: 0,
-        isFavorite: true,
-        playCount: 20,
-        creationDate: DateTime(2024, 1, 5),
-        modificationDate: DateTime(2024, 1, 25),
-        notes: "Modern hymn",
-      ),
-    ]);
-  }
-
-  // ✅ CORREGIDO: Usar toJson() en lugar de toMap()
-  Future<int> insertSong(Song song) async {
-    try {
-      return await _databaseHelper.insertSong(song);
-    } catch (e) {
-      print('Error inserting song: $e');
-      // Fallback to demo songs for testing
-      final newId = (_demoSongs.map((s) => s.id ?? 0).reduce((a, b) => a > b ? a : b)) + 1;
-      final newSong = song.copyWith(id: newId);
-      _demoSongs.add(newSong);
-      return newId;
+    List<Song> songs = [];
+    for (var map in maps) {
+      final song = Song.fromMap(map);
+      // Opcional: Cargar las categorías aquí si es necesario para la UI principal
+      // song.categories = await getCategoriasPorCancion(song.id!);
+      songs.add(song);
     }
+    return songs;
   }
 
-  // ✅ CORREGIDO: Usar fromJson() en lugar de fromMap()
-  Future<List<Song>> getSongs() async {
-    try {
-      final songs = await _databaseHelper.getSongs();
-      if (songs.isNotEmpty) {
-        return songs;
-      }
-    } catch (e) {
-      print('Error getting songs from database: $e');
-    }
-    
-    // Fallback to demo songs
-    return _demoSongs;
-  }
-
-  Future<Song?> getSongById(int id) async {
-    try {
-      final song = await _databaseHelper.getSongById(id);
-      if (song != null) {
-        return song;
-      }
-    } catch (e) {
-      print('Error getting song by id: $e');
-    }
-    
-    // Fallback to demo songs
-    return _demoSongs.firstWhere((song) => song.id == id, orElse: () => _demoSongs.first);
-  }
-
-  // ✅ CORREGIDO: Usar toJson() en lugar de toMap()
-  Future<int> updateSong(Song song) async {
-    try {
-      return await _databaseHelper.updateSong(song);
-    } catch (e) {
-      print('Error updating song: $e');
-      // Update in demo songs
-      final index = _demoSongs.indexWhere((s) => s.id == song.id);
-      if (index != -1) {
-        _demoSongs[index] = song;
-        return 1;
-      }
-      return 0;
-    }
-  }
-
-  Future<int> deleteSong(int id) async {
-    try {
-      return await _databaseHelper.deleteSong(id);
-    } catch (e) {
-      print('Error deleting song: $e');
-      // Delete from demo songs
-      final initialLength = _demoSongs.length;
-      _demoSongs.removeWhere((song) => song.id == id);
-      return initialLength - _demoSongs.length;
-    }
-  }
-
-  Future<List<Song>> searchSongs(String query) async {
-    final allSongs = await getSongs();
-    if (query.isEmpty) {
-      return allSongs;
-    }
-    
-    final queryLower = query.toLowerCase();
-    return allSongs.where((song) {
-      return song.title.toLowerCase().contains(queryLower) ||
-             (song.artist != null && song.artist!.toLowerCase().contains(queryLower)) ||
-             song.lyricsWithChords.toLowerCase().contains(queryLower) ||
-             (song.notes != null && song.notes!.toLowerCase().contains(queryLower));
-    }).toList();
-  }
-
-  Future<List<Song>> getFavoriteSongs() async {
-    final allSongs = await getSongs();
-    return allSongs.where((song) => song.isFavorite).toList();
-  }
-
-  Future<void> toggleFavorite(int songId) async {
-    final song = await getSongById(songId);
-    if (song != null) {
-      final updatedSong = song.copyWith(
-        isFavorite: !song.isFavorite,
-        modificationDate: DateTime.now(),
-      );
-      await updateSong(updatedSong);
-    }
-  }
-
-  Future<void> incrementPlayCount(int songId) async {
-    final song = await getSongById(songId);
-    if (song != null) {
-      final updatedSong = song.copyWith(
-        playCount: song.playCount + 1,
-        modificationDate: DateTime.now(),
-      );
-      await updateSong(updatedSong);
-    }
-  }
-
-  // Methods for demo data management
-  List<Song> getDemoSongs() {
-    return List.from(_demoSongs);
-  }
-
-  void clearDemoSongs() {
-    _demoSongs.clear();
-  }
-
-  void addDemoSong(Song song) {
-    _demoSongs.add(song);
-  }
-
-  // ✅ CORREGIDO: Métodos para categorías
   Future<List<Song>> getSongsByCategory(int categoryId) async {
-    // TODO: Implement when category relations are ready
-    final allSongs = await getSongs();
-    // For now, return all songs for testing
-    return allSongs;
-  }
+    final db = await _databaseHelper.database;
+    // Consulta para obtener canciones filtradas por una categoría específica
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT s.*, GROUP_CONCAT(cc.categoria_id) as categoria_ids
+      FROM songs s
+      INNER JOIN cancion_categoria cc ON s.id = cc.cancion_id
+      WHERE cc.categoria_id = ?
+      GROUP BY s.id
+    ''', [categoryId]);
 
-  // ✅ CORREGIDO: Métodos para setlists
-  Future<List<Song>> getSongsForSetlist(int setlistId) async {
-    try {
-      return await _databaseHelper.getSongsWithDetailsForSetlist(setlistId);
-    } catch (e) {
-      print('Error getting songs for setlist: $e');
-      // Fallback to first 3 demo songs for testing
-      return _demoSongs.take(3).toList();
+    List<Song> songs = [];
+    for (var map in maps) {
+      final song = Song.fromMap(map);
+      // Opcional: Cargar las categorías aquí si es necesario
+      // song.categories = await getCategoriasPorCancion(song.id!);
+      songs.add(song);
     }
+    return songs;
   }
 
-  // Utility method to initialize database with demo data
-  Future<void> initializeWithDemoData() async {
-    try {
-      final existingSongs = await _databaseHelper.getSongs();
-      if (existingSongs.isEmpty) {
-        for (final song in _demoSongs) {
-          await _databaseHelper.insertSong(song);
-        }
-        print('Demo data initialized successfully');
+  // Nuevo método para obtener canciones filtradas por múltiples categorías
+  Future<List<Song>> getSongsByCategories(List<int> categoryIds) async {
+    if (categoryIds.isEmpty) return getAllSongs(); // Si no hay categorías, devolver todas
+
+    final db = await _databaseHelper.database;
+    // Construir la cláusula IN dinámicamente
+    final placeholders = List.filled(categoryIds.length, '?').join(',');
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT s.*, GROUP_CONCAT(cc.categoria_id) as categoria_ids
+      FROM songs s
+      INNER JOIN cancion_categoria cc ON s.id = cc.cancion_id
+      WHERE cc.categoria_id IN ($placeholders)
+      GROUP BY s.id
+    ''', categoryIds);
+
+    List<Song> songs = [];
+    for (var map in maps) {
+      final song = Song.fromMap(map);
+      // Opcional: Cargar las categorías aquí si es necesario
+      // song.categories = await getCategoriasPorCancion(song.id!);
+      songs.add(song);
+    }
+    return songs;
+  }
+
+  // Nuevo método para buscar canciones por texto en múltiples campos
+  Future<List<Song>> searchSongs(String query) async {
+    if (query.isEmpty) return getAllSongs(); // Si no hay búsqueda, devolver todas
+
+    final db = await _databaseHelper.database;
+    final lowerQuery = query.toLowerCase(); // Para búsquedas insensibles a mayúsculas
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT s.*, GROUP_CONCAT(cc.categoria_id) as categoria_ids
+      FROM songs s
+      LEFT JOIN cancion_categoria cc ON s.id = cc.cancion_id
+      WHERE LOWER(s.titulo) LIKE ? 
+         OR LOWER(s.autor) LIKE ? 
+         OR LOWER(s.letra_con_acordes) LIKE ? 
+         OR LOWER(s.notas) LIKE ?
+      GROUP BY s.id
+    ''', ['%$lowerQuery%', '%$lowerQuery%', '%$lowerQuery%', '%$lowerQuery%']);
+
+    List<Song> songs = [];
+    for (var map in maps) {
+      final song = Song.fromMap(map);
+      // Opcional: Cargar las categorías aquí si es necesario
+      // song.categories = await getCategoriasPorCancion(song.id!);
+      songs.add(song);
+    }
+    return songs;
+  }
+
+  // Nuevo método para obtener canciones favoritas
+  Future<List<Song>> getFavoriteSongs() async {
+    final db = await _databaseHelper.database;
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT s.*, GROUP_CONCAT(cc.categoria_id) as categoria_ids
+      FROM songs s
+      LEFT JOIN cancion_categoria cc ON s.id = cc.cancion_id
+      WHERE s.es_favorita = 1
+      GROUP BY s.id
+    ''');
+
+    List<Song> songs = [];
+    for (var map in maps) {
+      final song = Song.fromMap(map);
+      // Opcional: Cargar las categorías aquí si es necesario
+      // song.categories = await getCategoriasPorCancion(song.id!);
+      songs.add(song);
+    }
+    return songs;
+  }
+
+  Future<void> insertSong(Song song) async {
+    final db = await _databaseHelper.database;
+    await db.transaction((txn) async {
+      // 1. Insertar la canción
+      final songId = await txn.insert('songs', song.toMap());
+
+      // 2. Insertar las relaciones con categorías (si las hubiera)
+      // NOTA: Este método asume que el ID de la categoría ya está disponible.
+      // La lógica para obtener/crear categorías por nombre se podría mover aquí o mantener externa.
+      // Por ahora, asumimos que se manejan previamente si es necesario.
+      // Si Song.model incluyera directamente IDs de categorías, se usarían aquí.
+      // Por ejemplo, si Song tuviera List<int> categoryIds:
+      // for (int catId in song.categoryIds) {
+      //   await txn.insert('cancion_categoria', {
+      //     'cancion_id': songId,
+      //     'categoria_id': catId,
+      //   });
+      // }
+      // Dado que el modelo actual no tiene una lista de IDs directamente,
+      // la asignación de categorías se debería manejar en un método separado o
+      // se debería adaptar la lógica de inserción/edición de canciones para
+      // manejar la relación después de obtener el ID de la canción.
+      // Por ahora, solo insertamos la canción principal.
+    });
+  }
+
+  // ... (resto del archivo igual) ...
+  Future<void> updateSong(Song song) async {
+    if (song.id == null) return; // No se puede actualizar sin ID
+
+    final db = await _databaseHelper.database;
+    await db.transaction((txn) async {
+      // 1. Actualizar la canción principal (ahora incluye content transpuesto y originalKey transpuesta)
+      await txn.update('songs', song.toMap(), where: 'id = ?', whereArgs: [song.id]);
+
+      // 2. Opcional: Actualizar relaciones con categorías (borrar y reinsertar, o manejo más complejo)
+      // await txn.delete('cancion_categoria', where: 'cancion_id = ?', whereArgs: [song.id]);
+      // Luego insertar las nuevas relaciones como en insertSong
+      // Por simplicidad en esta actualización, no se manejan categorías aquí directamente.
+      // Se podría implementar un método updateSongWithCategories.
+    });
+  }
+// ... (resto del archivo igual) ...
+
+  Future<void> deleteSong(int id) async {
+    final db = await _databaseHelper.database;
+    // Debido a ON DELETE CASCADE en la base de datos, se eliminarán
+    // automáticamente las entradas en cancion_categoria y setlist_cancion.
+    await db.delete('songs', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // --- Gestión de Categorías por Canción ---
+  // Método para asignar categorías a una canción (borra antiguas y agrega nuevas)
+  Future<void> setCategoriasForSong(int songId, List<int> categoryIds) async {
+    final db = await _databaseHelper.database;
+    await db.transaction((txn) async {
+      // Borrar relaciones antiguas
+      await txn.delete('cancion_categoria', where: 'cancion_id = ?', whereArgs: [songId]);
+
+      // Insertar nuevas relaciones
+      for (int catId in categoryIds) {
+        await txn.insert('cancion_categoria', {
+          'cancion_id': songId,
+          'categoria_id': catId,
+        });
       }
-    } catch (e) {
-      print('Error initializing demo data: $e');
-    }
+    });
   }
 
-  // Method to get statistics
-  Future<Map<String, int>> getStatistics() async {
-    final songs = await getSongs();
-    return {
-      'totalSongs': songs.length,
-      'favoriteSongs': songs.where((s) => s.isFavorite).length,
-      'totalPlays': songs.fold(0, (sum, song) => sum + song.playCount),
-    };
+  // Método para obtener IDs de categorías asociadas a una canción
+  Future<List<int>> getCategoriaIdsForSong(int songId) async {
+    final db = await _databaseHelper.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'cancion_categoria',
+      columns: ['categoria_id'],
+      where: 'cancion_id = ?',
+      whereArgs: [songId],
+    );
+    return maps.map((map) => map['categoria_id'] as int).toList();
   }
 
-  // Method to get recently played songs
-  Future<List<Song>> getRecentlyPlayed({int limit = 5}) async {
-    final songs = await getSongs();
-    songs.sort((a, b) => b.playCount.compareTo(a.playCount));
-    return songs.take(limit).toList();
-  }
+  // --- CRUD Setlists ---
+  Future<List<Setlist>> getAllSetlists() async {
+    final db = await _databaseHelper.database;
+    final List<Map<String, dynamic>> setlistMaps = await db.query('setlists', orderBy: 'nombre');
 
-  // Method to get newest songs
-  Future<List<Song>> getNewestSongs({int limit = 5}) async {
-    final songs = await getSongs();
-    songs.sort((a, b) => b.creationDate.compareTo(a.creationDate));
-    return songs.take(limit).toList();
-  }
+    List<Setlist> setlists = [];
+    for (var setlistMap in setlistMaps) {
+      final setlist = Setlist.fromMap(setlistMap);
 
-  // AGREGAR este método para inicializar setlists demo
-  Future<void> initializeSetlistsDemoData() async {
-    try {
-      final dbHelper = DatabaseHelper();
-      final existingSetlists = await dbHelper.getSetlists();
-      
-      if (existingSetlists.isEmpty) {
-        print('🔄 Inicializando setlists demo...');
-        
-        // Crear setlists demo
-        final demoSetlists = [
-          Setlist(
-            name: "Misa Dominical",
-            eventDate: DateTime(2024, 2, 4),
-            notes: "Misa de 10:00 AM",
-            creationDate: DateTime.now(),
-            modificationDate: DateTime.now(),
-          ),
-          Setlist(
-            name: "Navidad 2024", 
-            eventDate: DateTime(2024, 12, 24),
-            notes: "Misa de Nochebuena",
-            creationDate: DateTime.now(),
-            modificationDate: DateTime.now(),
-          ),
-          Setlist(
-            name: "Bautismo Juan Pérez",
-            eventDate: DateTime(2024, 3, 15),
-            notes: "Ceremonia de bautismo",
-            creationDate: DateTime.now(), 
-            modificationDate: DateTime.now(),
-          ),
-        ];
-        
-        for (final setlist in demoSetlists) {
-          await dbHelper.insertSetlist(setlist);
+      // Cargar las canciones del setlist con sus configuraciones personalizadas
+      final songMaps = await db.query(
+        'setlist_cancion',
+        where: 'setlist_id = ?',
+        whereArgs: [setlist.id],
+        orderBy: 'orden ASC',
+      );
+
+      List<SetlistItem> setlistItems = [];
+      for (var songMap in songMaps) {
+        final songId = songMap['cancion_id'] as int;
+        final order = songMap['orden'] as int;
+        final transposition = songMap['transposicion_semitonos'] as int? ?? 0;
+        final capo = songMap['capo_personalizado'] as int?; // Puede ser nulo
+
+        // Obtener el objeto Song completo
+        final songResult = await db.query('songs', where: 'id = ?', whereArgs: [songId]);
+        if (songResult.isNotEmpty) {
+          final song = Song.fromMap(songResult.first);
+          setlistItems.add(SetlistItem(
+            song: song,
+            order: order,
+            transposition: transposition,
+            capo: capo,
+          ));
         }
-        
-        print('✅ Setlists demo inicializados: ${demoSetlists.length} setlists');
-      } else {
-        print('✅ Ya existen ${existingSetlists.length} setlists');
       }
-    } catch (e) {
-      print('❌ Error inicializando setlists demo: $e');
+      // Crear un nuevo objeto Setlist con las canciones cargadas
+      setlists.add(Setlist(
+        id: setlist.id,
+        name: setlist.name,
+        eventDate: setlist.eventDate,
+        notes: setlist.notes,
+        creationDate: setlist.creationDate,
+        modificationDate: setlist.modificationDate,
+        songs: setlistItems,
+      ));
+    }
+    return setlists;
+  }
+
+  Future<void> insertSetlist(Setlist setlist) async {
+    final db = await _databaseHelper.database;
+    await db.transaction((txn) async {
+      // 1. Insertar el setlist
+      final setlistId = await txn.insert('setlists', setlist.toMap());
+
+      // 2. Insertar las canciones del setlist con sus configuraciones
+      for (int i = 0; i < setlist.songs.length; i++) {
+        final setlistItem = setlist.songs[i];
+        await txn.insert('setlist_cancion', {
+          'setlist_id': setlistId,
+          'cancion_id': setlistItem.song.id!,
+          'orden': i + 1, // Orden empieza en 1
+          'transposicion_semitonos': setlistItem.transposition,
+          'capo_personalizado': setlistItem.capo, // Puede ser nulo
+        });
+      }
+    });
+  }
+
+  Future<void> updateSetlist(Setlist setlist) async {
+    if (setlist.id == null) return; // No se puede actualizar sin ID
+
+    final db = await _databaseHelper.database;
+    await db.transaction((txn) async {
+      // 1. Actualizar el setlist
+      await txn.update('setlists', setlist.toMap(), where: 'id = ?', whereArgs: [setlist.id]);
+
+      // 2. Borrar canciones antiguas
+      await txn.delete('setlist_cancion', where: 'setlist_id = ?', whereArgs: [setlist.id]);
+
+      // 3. Insertar canciones nuevas con sus configuraciones
+      for (int i = 0; i < setlist.songs.length; i++) {
+        final setlistItem = setlist.songs[i];
+        await txn.insert('setlist_cancion', {
+          'setlist_id': setlist.id,
+          'cancion_id': setlistItem.song.id!,
+          'orden': i + 1,
+          'transposicion_semitonos': setlistItem.transposition,
+          'capo_personalizado': setlistItem.capo, // Puede ser nulo
+        });
+      }
+    });
+  }
+
+  Future<void> deleteSetlist(int id) async {
+    final db = await _databaseHelper.database;
+    // Debido a ON DELETE CASCADE en la base de datos, se eliminarán
+    // automáticamente las entradas en setlist_cancion.
+    await db.delete('setlists', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // --- Marcar/Desmarcar Favorito ---
+  Future<void> toggleFavorite(int songId) async {
+    final db = await _databaseHelper.database;
+    // Obtener el estado actual de favorito
+    final result = await db.query('songs', columns: ['es_favorita'], where: 'id = ?', whereArgs: [songId]);
+    if (result.isNotEmpty) {
+      final isFavorite = (result.first['es_favorita'] as int) == 1;
+      // Actualizar el estado invirtiendo el valor
+      await db.update('songs', {'es_favorita': isFavorite ? 0 : 1}, where: 'id = ?', whereArgs: [songId]);
     }
   }
 
-
+  // --- Incrementar Contador de Reproducciones ---
+  Future<void> incrementPlayCount(int songId) async {
+    final db = await _databaseHelper.database;
+    await db.rawUpdate('''
+      UPDATE songs 
+      SET contador_reproducciones = contador_reproducciones + 1, 
+          fecha_modificacion = ? 
+      WHERE id = ?
+    ''', [DateTime.now().toIso8601String(), songId]);
+  }
 }

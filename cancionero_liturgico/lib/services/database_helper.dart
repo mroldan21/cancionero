@@ -1,8 +1,5 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import '../models/song.dart';
-import '../models/category_model.dart';
-import '../models/setlist_model.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -12,629 +9,328 @@ class DatabaseHelper {
   static Database? _database;
 
   Future<Database> get database async {
-    _database ??= await _initDatabase();
+    if (_database != null) return _database!;
+    _database = await _initDatabase();
     return _database!;
   }
 
   Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), 'cancionero_liturgico.db');
+    String path = join(await getDatabasesPath(), 'cancionero.db');
     return await openDatabase(
       path,
-      version: 3, // Incremented version for schema corrections
+      version: 2, // Incrementar versión para permitir migración
       onCreate: _onCreate,
-      onUpgrade: _onUpgrade,
+      onUpgrade: _onUpgrade, // Añadir callback de actualización
     );
+  }
+
+  // Nueva función para manejar actualizaciones de versión
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    // Este es un ejemplo simple para la migración de v1 a v2
+    // En aplicaciones reales, las migraciones deben ser más robustas y específicas por versión
+    if (oldVersion < 2) {
+      // Eliminar tablas antiguas si existen (esto borrará datos existentes)
+      await db.execute('DROP TABLE IF EXISTS categories;');
+      await db.execute('DROP TABLE IF EXISTS songs;');
+      await db.execute('DROP TABLE IF EXISTS cancion_categoria;');
+      await db.execute('DROP TABLE IF EXISTS setlists;');
+      await db.execute('DROP TABLE IF EXISTS setlist_cancion;');
+      await db.execute('DROP TABLE IF EXISTS configuracion;');
+
+      // Crear tablas nuevas según el modelo de datos actualizado
+      await _createTables(db);
+
+      // Insertar datos semilla (categorías predefinidas y canciones de ejemplo)
+      await _insertSeedData(db);
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
-    // Songs table - CORREGIDO a inglés consistente
+    // Crear tablas según el modelo de datos actualizado
+    await _createTables(db);
+
+    // Insertar datos semilla (categorías predefinidas y canciones de ejemplo)
+    await _insertSeedData(db);
+  }
+
+  // Función auxiliar para crear todas las tablas
+  Future<void> _createTables(Database db) async {
+    // Tabla de Categorías
     await db.execute('''
-      CREATE TABLE songs(
+      CREATE TABLE categories (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        artist TEXT,
-        lyrics_with_chords TEXT NOT NULL,
-        original_key TEXT NOT NULL,
-        tempo_bpm INTEGER,
-        capo_position INTEGER DEFAULT 0,
-        is_favorite INTEGER DEFAULT 0,
-        play_count INTEGER DEFAULT 0,
-        creation_date TEXT NOT NULL,
-        modification_date TEXT NOT NULL,
-        notes TEXT,
-        video_links TEXT
+        nombre TEXT NOT NULL UNIQUE,
+        color TEXT,
+        orden INTEGER DEFAULT 0,
+        es_predefinida INTEGER DEFAULT 0 -- BOOLEANO: 0 = false, 1 = true
       )
     ''');
 
-    // Categories table - CORREGIDO a inglés consistente
+    // Tabla de Canciones
     await db.execute('''
-      CREATE TABLE categories(
+      CREATE TABLE songs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL UNIQUE,
-        color TEXT DEFAULT "#4CAF50",
-        order_index INTEGER DEFAULT 0,
-        is_predefined INTEGER DEFAULT 0
+        titulo TEXT NOT NULL,
+        autor TEXT,
+        letra_con_acordes TEXT NOT NULL,
+        tonalidad_original TEXT NOT NULL,
+        tempo_bpm INTEGER, -- Puede ser nulo
+        posicion_capo INTEGER DEFAULT 0,
+        es_favorita INTEGER DEFAULT 0, -- BOOLEANO
+        contador_reproducciones INTEGER DEFAULT 0,
+        fecha_creacion TEXT NOT NULL, -- Almacenar como TEXT en formato ISO
+        fecha_modificacion TEXT NOT NULL, -- Almacenar como TEXT en formato ISO
+        notas TEXT,
+        enlaces_video TEXT -- Almacenar como CSV o JSON en un STRING
       )
     ''');
 
-    // Song-Category relation table - CORREGIDO a inglés
+    // Tabla de Relación Muchos a Muchos: Canciones y Categorías
     await db.execute('''
-      CREATE TABLE song_category(
+      CREATE TABLE cancion_categoria (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        song_id INTEGER NOT NULL,
-        category_id INTEGER NOT NULL,
-        FOREIGN KEY(song_id) REFERENCES songs(id) ON DELETE CASCADE,
-        FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE CASCADE,
-        UNIQUE(song_id, category_id)
+        cancion_id INTEGER NOT NULL,
+        categoria_id INTEGER NOT NULL,
+        FOREIGN KEY (cancion_id) REFERENCES songs (id) ON DELETE CASCADE,
+        FOREIGN KEY (categoria_id) REFERENCES categories (id) ON DELETE CASCADE,
+        UNIQUE(cancion_id, categoria_id)
       )
     ''');
 
-    // Setlists table
+    // Tabla de Setlists
     await db.execute('''
-      CREATE TABLE setlists(
+      CREATE TABLE setlists (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        event_date TEXT,
-        notes TEXT,
-        creation_date TEXT NOT NULL,
-        modification_date TEXT NOT NULL
+        nombre TEXT NOT NULL UNIQUE,
+        fecha_evento TEXT, -- Almacenar como TEXT en formato ISO
+        notas TEXT,
+        fecha_creacion TEXT NOT NULL, -- Almacenar como TEXT en formato ISO
+        fecha_modificacion TEXT NOT NULL -- Almacenar como TEXT en formato ISO
       )
     ''');
 
-    // Setlist-Songs relation table
+    // Tabla de Relación con Configuración: Canciones en Setlists
     await db.execute('''
-      CREATE TABLE setlist_songs(
+      CREATE TABLE setlist_cancion (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         setlist_id INTEGER NOT NULL,
-        song_id INTEGER NOT NULL,
-        order_index INTEGER NOT NULL,
-        transposition_semitones INTEGER DEFAULT 0,
-        custom_capo INTEGER,
-        FOREIGN KEY(setlist_id) REFERENCES setlists(id) ON DELETE CASCADE,
-        FOREIGN KEY(song_id) REFERENCES songs(id) ON DELETE CASCADE
+        cancion_id INTEGER NOT NULL,
+        orden INTEGER NOT NULL,
+        transposicion_semitonos INTEGER DEFAULT 0,
+        capo_personalizado INTEGER, -- Puede ser nulo si no se usa capo en esta instancia
+        FOREIGN KEY (setlist_id) REFERENCES setlists (id) ON DELETE CASCADE,
+        FOREIGN KEY (cancion_id) REFERENCES songs (id) ON DELETE CASCADE,
+        UNIQUE(setlist_id, orden)
       )
     ''');
 
-    // Insert predefined categories
-    await _insertPredefinedCategories(db);
+    // Tabla de Configuración (Key-Value)
+    await db.execute('''
+      CREATE TABLE configuracion (
+        clave TEXT PRIMARY KEY,
+        valor TEXT NOT NULL,
+        fecha_modificacion TEXT NOT NULL -- Almacenar como TEXT en formato ISO
+      )
+    ''');
+
+    // Crear índices para optimizar búsquedas y consultas
+    await db.execute('CREATE INDEX idx_titulo ON songs (titulo);');
+    await db.execute('CREATE INDEX idx_favoritas ON songs (es_favorita);');
+    await db.execute('CREATE INDEX idx_fecha_modificacion_songs ON songs (fecha_modificacion);');
+    await db.execute('CREATE INDEX idx_nombre_categoria ON categories (nombre);');
+    await db.execute('CREATE INDEX idx_orden_categoria ON categories (orden);');
+    await db.execute('CREATE INDEX idx_nombre_setlist ON setlists (nombre);');
+    await db.execute('CREATE INDEX idx_fecha_evento_setlist ON setlists (fecha_evento);');
+    await db.execute('CREATE INDEX idx_setlist_cancion_setlist ON setlist_cancion (setlist_id);');
+    await db.execute('CREATE INDEX idx_setlist_cancion_orden ON setlist_cancion (setlist_id, orden);');
   }
 
-  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < 3) {
-      // Migrations for version 3 - CORRECCIONES DE CONSISTENCIA
-      
-      // Backup old data if tables exist
-      bool oldSongsTableExists = false;
-      bool oldCategoriesTableExists = false;
-      
-      try {
-        await db.rawQuery('SELECT 1 FROM canciones LIMIT 1');
-        oldSongsTableExists = true;
-      } catch (_) {}
-      
-      try {
-        await db.rawQuery('SELECT 1 FROM categorias LIMIT 1');
-        oldCategoriesTableExists = true;
-      } catch (_) {}
+  // Función auxiliar para insertar datos semilla
+  Future<void> _insertSeedData(Database db) async {
+    // Verificar si ya existen categorías (para evitar duplicados en reinicios)
+    final categoryCountResult = await db.rawQuery('SELECT COUNT(*) as count FROM categories');
+    final categoryCount = Sqflite.firstIntValue(categoryCountResult) ?? 0;
 
-      // Create new tables with consistent English names
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS songs(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          title TEXT NOT NULL,
-          artist TEXT,
-          lyrics_with_chords TEXT NOT NULL,
-          original_key TEXT NOT NULL,
-          tempo_bpm INTEGER,
-          capo_position INTEGER DEFAULT 0,
-          is_favorite INTEGER DEFAULT 0,
-          play_count INTEGER DEFAULT 0,
-          creation_date TEXT NOT NULL,
-          modification_date TEXT NOT NULL,
-          notes TEXT,
-          video_links TEXT
-        )
-      ''');
-
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS categories(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL UNIQUE,
-          color TEXT DEFAULT "#4CAF50",
-          order_index INTEGER DEFAULT 0,
-          is_predefined INTEGER DEFAULT 0
-        )
-      ''');
-
-      // Migrate data from old tables if they exist
-      if (oldSongsTableExists) {
-        await db.rawQuery('''
-          INSERT INTO songs (id, title, artist, lyrics_with_chords, original_key, 
-                           tempo_bpm, capo_position, is_favorite, play_count, 
-                           creation_date, modification_date, notes, video_links)
-          SELECT id, titulo, autor, letra_con_acordes, tonalidad_original,
-                 tempo_bpm, posicion_capo, es_favorita, contador_reproducciones,
-                 fecha_creacion, fecha_modificacion, notas, enlaces_video
-          FROM canciones
-        ''');
-      }
-
-      if (oldCategoriesTableExists) {
-        await db.rawQuery('''
-          INSERT INTO categories (id, name, color, order_index, is_predefined)
-          SELECT id, nombre, color, orden, es_predefinida
-          FROM categorias
-        ''');
-      }
-
-      // Create other tables if they don't exist
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS song_category(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          song_id INTEGER NOT NULL,
-          category_id INTEGER NOT NULL,
-          FOREIGN KEY(song_id) REFERENCES songs(id) ON DELETE CASCADE,
-          FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE CASCADE,
-          UNIQUE(song_id, category_id)
-        )
-      ''');
-
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS setlists(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL,
-          event_date TEXT,
-          notes TEXT,
-          creation_date TEXT NOT NULL,
-          modification_date TEXT NOT NULL
-        )
-      ''');
-
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS setlist_songs(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          setlist_id INTEGER NOT NULL,
-          song_id INTEGER NOT NULL,
-          order_index INTEGER NOT NULL,
-          transposition_semitones INTEGER DEFAULT 0,
-          custom_capo INTEGER,
-          FOREIGN KEY(setlist_id) REFERENCES setlists(id) ON DELETE CASCADE,
-          FOREIGN KEY(song_id) REFERENCES songs(id) ON DELETE CASCADE
-        )
-      ''');
-      
+    if (categoryCount == 0) {
+      print("Insertando categorías predefinidas...");
       await _insertPredefinedCategories(db);
+    } else {
+      print("Categorías ya existen ($categoryCount), omitiendo inserción.");
+    }
+
+    // Verificar si ya existen canciones (para evitar duplicados en reinicios)
+    final songCountResult = await db.rawQuery('SELECT COUNT(*) as count FROM songs');
+    final songCount = Sqflite.firstIntValue(songCountResult) ?? 0;
+
+    if (songCount == 0) {
+      print("Insertando canciones de ejemplo...");
+      await _insertExampleSongs(db);
+    } else {
+      print("Canciones ya existen ($songCount), omitiendo inserción.");
     }
   }
 
+  // Función auxiliar para insertar categorías predefinidas
   Future<void> _insertPredefinedCategories(Database db) async {
-    final categories = [
-      {'name': 'Entrada', 'color': '#4CAF50', 'order_index': 1, 'is_predefined': 1},
-      {'name': 'Meditación', 'color': '#2196F3', 'order_index': 2, 'is_predefined': 1},
-      {'name': 'Virgen María', 'color': '#E91E63', 'order_index': 3, 'is_predefined': 1},
-      {'name': 'Comunión', 'color': '#FFC107', 'order_index': 4, 'is_predefined': 1},
-      {'name': 'Ofertorio', 'color': '#FF9800', 'order_index': 5, 'is_predefined': 1},
-      {'name': 'Salida', 'color': '#9C27B0', 'order_index': 6, 'is_predefined': 1},
-      {'name': 'Adoración', 'color': '#FF5722', 'order_index': 7, 'is_predefined': 1},
-      {'name': 'Penitencial', 'color': '#795548', 'order_index': 8, 'is_predefined': 1},
-      {'name': 'Aleluya', 'color': '#FFEB3B', 'order_index': 9, 'is_predefined': 1},
+    final predefinedCategories = [
+      {'nombre': 'Entrada', 'color': '#4CAF50', 'orden': 1},
+      {'nombre': 'Meditación', 'color': '#2196F3', 'orden': 2},
+      {'nombre': 'Virgen María', 'color': '#E91E63', 'orden': 3},
+      {'nombre': 'Comunión', 'color': '#FFC107', 'orden': 4},
+      {'nombre': 'Ofertorio', 'color': '#FF9800', 'orden': 5},
+      {'nombre': 'Salida', 'color': '#9C27B0', 'orden': 6},
+      {'nombre': 'Adoración', 'color': '#FF5722', 'orden': 7},
+      {'nombre': 'Penitencial', 'color': '#795548', 'orden': 8},
+      {'nombre': 'Aleluya', 'color': '#FFEB3B', 'orden': 9},
     ];
 
-    for (var category in categories) {
-      await db.insert('categories', category, conflictAlgorithm: ConflictAlgorithm.ignore);
+    for (var catData in predefinedCategories) {
+      await db.insert('categories', {
+        'nombre': catData['nombre'],
+        'color': catData['color'],
+        'orden': catData['orden'],
+        'es_predefinida': 1, // Marcado como predefinido
+      });
     }
   }
 
-  // ========== SONG METHODS ==========
-
-  Future<int> insertSong(Song song) async {
-    final db = await database;
-    return await db.insert('songs', {
-      'title': song.title,
-      'artist': song.artist,
-      'lyrics_with_chords': song.lyricsWithChords,
-      'original_key': song.originalKey,
-      'tempo_bpm': song.tempoBpm,
-      'capo_position': song.capoPosition,
-      'is_favorite': song.isFavorite ? 1 : 0,
-      'play_count': song.playCount,
-      'creation_date': song.creationDate.toIso8601String(),
-      'modification_date': song.modificationDate.toIso8601String(),
-      'notes': song.notes,
-      'video_links': song.videoLinks != null ? song.videoLinks!.join('||') : null,
-    });
-  }
-
-  Future<List<Song>> getSongs() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query('songs', orderBy: 'title');
-    
-    return List.generate(maps.length, (i) {
-      return Song(
-        id: maps[i]['id'],
-        title: maps[i]['title'],
-        artist: maps[i]['artist'],
-        lyricsWithChords: maps[i]['lyrics_with_chords'],
-        originalKey: maps[i]['original_key'],
-        tempoBpm: maps[i]['tempo_bpm'],
-        capoPosition: maps[i]['capo_position'] ?? 0,
-        isFavorite: maps[i]['is_favorite'] == 1,
-        playCount: maps[i]['play_count'] ?? 0,
-        creationDate: DateTime.parse(maps[i]['creation_date']),
-        modificationDate: DateTime.parse(maps[i]['modification_date']),
-        notes: maps[i]['notes'],
-        videoLinks: maps[i]['video_links'] != null 
-            ? (maps[i]['video_links'] as String).split('||')
-            : null,
-      );
-    });
-  }
-
-  Future<Song?> getSongById(int id) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'songs',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-    
-    if (maps.isNotEmpty) {
-      return Song(
-        id: maps[0]['id'],
-        title: maps[0]['title'],
-        artist: maps[0]['artist'],
-        lyricsWithChords: maps[0]['lyrics_with_chords'],
-        originalKey: maps[0]['original_key'],
-        tempoBpm: maps[0]['tempo_bpm'],
-        capoPosition: maps[0]['capo_position'] ?? 0,
-        isFavorite: maps[0]['is_favorite'] == 1,
-        playCount: maps[0]['play_count'] ?? 0,
-        creationDate: DateTime.parse(maps[0]['creation_date']),
-        modificationDate: DateTime.parse(maps[0]['modification_date']),
-        notes: maps[0]['notes'],
-        videoLinks: maps[0]['video_links'] != null 
-            ? (maps[0]['video_links'] as String).split('||')
-            : null,
-      );
+  
+  // Función auxiliar para insertar canciones de ejemplo
+  // lib/services/database_helper.dart
+  Future<void> _insertExampleSongs(Database db) async {
+    // 1. Obtener IDs de categorías predefinidas para asociarlas
+    Map<String, int> categoryMap = {};
+    final categoryResults = await db.query('categories', columns: ['id', 'nombre']);
+    for (var row in categoryResults) {
+      // Asegurar cast explícito para nombre y id
+      final catName = row['nombre'] as String;
+      final catId = row['id'] as int;
+      categoryMap[catName] = catId;
     }
-    return null;
-  }
 
-  Future<int> updateSong(Song song) async {
-    final db = await database;
-    return await db.update(
-      'songs',
+    final exampleSongs = [
+      // ... (tu lista de exampleSongs aquí, igual que antes) ...
       {
-        'title': song.title,
-        'artist': song.artist,
-        'lyrics_with_chords': song.lyricsWithChords,
-        'original_key': song.originalKey,
-        'tempo_bpm': song.tempoBpm,
-        'capo_position': song.capoPosition,
-        'is_favorite': song.isFavorite ? 1 : 0,
-        'play_count': song.playCount,
-        'modification_date': DateTime.now().toIso8601String(),
-        'notes': song.notes,
-        'video_links': song.videoLinks != null ? song.videoLinks!.join('||') : null,
+        "titulo": "Ave María",
+        "autor": "Franz Schubert",
+        "letra_con_acordes": "    G              C              G              D\nDios te salve, María, llena eres de gracia\n    G              C              G              D\nEl Señor es contigo, bendita Tú eres\n    Em             C              G              D\nMadre del Señor, Ruega por nosotros\n    G              C              G              D\nQue pecadores invocamos tu nombre\n\n    G              C              G              D\nSanta María, Madre de Dios\n    Em             C              G              D\nRuega por nosotros, Ruega por nosotros\n    G              C              G              D\nSanta María, Madre de Dios\n    Em             C              G              D\nRuega por nosotros, Ruega por nosotros\n\n    G              C              G              D\nSanta María, Madre de Dios\n    Em             C              G              D\nRuega por nosotros, Ruega por nosotros\n    G              C              G              D\nSanta María, Madre de Dios\n    Em             C              G              D\nRuega por nosotros, Ruega por nosotros",
+        "tonalidad_original": "G",
+        "tempo_bpm": 70,
+        "posicion_capo": 0,
+        "notas": "Canta el estribillo a capella",
+        "enlaces_video": ["https://www.youtube.com/watch?v=ejemplo_ave_maria"],
+        "categorias": ["Virgen María", "Adoración"]
       },
-      where: 'id = ?',
-      whereArgs: [song.id],
-    );
-  }
+      {
+        "titulo": "Alabado Sea el Señor",
+        "autor": "Juan Pérez",
+        "letra_con_acordes": "    G              Em             C              D\nAlabado sea el Señor, por su amor y compasión\n    G              Em             C              D\nPor su gracia infinita, por su bendición\n\n    Em             C              G              D\nCantemos con alegría, demos gracias al Señor\n    Em             C              G              D\nCon el corazón abierto, demos gloria al Señor",
+        "tonalidad_original": "G",
+        "tempo_bpm": 120,
+        "posicion_capo": 2,
+        "notas": "Canta María el estribillo",
+        "enlaces_video": ["https://www.youtube.com/watch?v=ejemplo_alabado"],
+        "categorias": ["Entrada", "Adoración"]
+      },
+      {
+        "titulo": "Canto de Meditación",
+        "autor": "María López",
+        "letra_con_acordes": "    Am             F              C              G\nEn silencio, en oración, me acerco a Ti\n    Am             F              C              G\nCon el alma en paz, Señor, te hablo aquí\n\n    F              C              G              Am\nTus palabras son mi luz, mi guía fiel\n    F              C              G              Am\nEn tus brazos, Padre mío, hallaré el bien",
+        "tonalidad_original": "Am",
+        "tempo_bpm": 72,
+        "posicion_capo": 0,
+        "notas": "",
+        "enlaces_video": [],
+        "categorias": ["Meditación"]
+      },
+      {
+        "titulo": "Gloria al Padre",
+        "autor": "Coro Parroquial",
+        "letra_con_acordes": "    C              F              G              Am\nGloria al Padre, al Hijo y al Espíritu Santo\n    C              F              G              Am\nDios de la vida, luz del amor\n\n    F              G              Am             Em\nDios de la vida, luz del amor\n    F              G              C              G\nDios de la vida, luz del amor\n\n    C              F              G              Am\nGloria al Padre, al Hijo y al Espíritu Santo\n    C              F              G              Am\nDios de la vida, luz del amor\n\n    F              G              Am             Em\nDios de la vida, luz del amor\n    F              G              C              G\nDios de la vida, luz del amor\n\n    C              F              G              Am\nGloria al Padre, al Hijo y al Espíritu Santo\n    C              F              G              Am\nDios de la vida, luz del amor\n\n    F              G              Am             Em\nDios de la vida, luz del amor\n    F              G              C              G\nDios de la vida, luz del amor\n\n    C              F              G              Am\nGloria al Padre, al Hijo y al Espíritu Santo\n    C              F              G              Am\nDios de la vida, luz del amor\n\n    F              G              Am             Em\nDios de la vida, luz del amor\n    F              G              C              G\nDios de la vida, luz del amor\n\n    C              F              G              Am\nGloria al Padre, al Hijo y al Espíritu Santo\n    C              F              G              Am\nDios de la vida, luz del amor\n\n    F              G              Am             Em\nDios de la vida, luz del amor\n    F              G              C              G\nDios de la vida, luz del amor\n\n    C              F              G              Am\nGloria al Padre, al Hijo y al Espíritu Santo\n    C              F              G              Am\nDios de la vida, luz del amor\n\n    F              G              Am             Em\nDios de la vida, luz del amor\n    F              G              C              G\nDios de la vida, luz del amor",
+        "tonalidad_original": "C",
+        "tempo_bpm": 110,
+        "posicion_capo": 0,
+        "notas": "Cantar con entusiasmo",
+        "enlaces_video": ["https://www.youtube.com/watch?v=ejemplo_gloria"],
+        "categorias": ["Ofertorio", "Adoración"]
+      },
+      {
+        "titulo": "Salida en Gloria",
+        "autor": "Luis González",
+        "letra_con_acordes": "    D              A              Bm             G\nSalgamos del templo, con Cristo en el corazón\n    D              A              Bm             G\nLlevemos su luz al mundo, con amor y devoción\n\n    A              G              D              A\nQue el Señor nos bendiga, nos guíe y nos proteja\n    A              G              D              A\nY que su paz nos llene, cada día de nuestra vida",
+        "tonalidad_original": "D",
+        "tempo_bpm": 95,
+        "posicion_capo": 0,
+        "notas": "",
+        "enlaces_video": [],
+        "categorias": ["Salida"]
+      }
+    ];
 
-  Future<int> deleteSong(int id) async {
-    final db = await database;
-    return await db.delete(
-      'songs',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
+    // 2. Iterar sobre las canciones de ejemplo
+    for (var songData in exampleSongs) {
+      // 3. Insertar la canción
+      // Asegurar casts explícitos para campos requeridos y manejar campos opcionales
+      final songId = await db.insert('songs', {
+        'titulo': songData['titulo'] as String, // Cast explícito
+        'autor': (songData['autor'] as String?)?.isNotEmpty == true ? songData['autor'] as String : null, // Cast y manejo de vacío
+        'letra_con_acordes': songData['letra_con_acordes'] as String, // Cast explícito
+        'tonalidad_original': songData['tonalidad_original'] as String, // Cast explícito
+        'tempo_bpm': (songData['tempo_bpm'] as num?)?.toInt(), // Cast y conversión
+        'posicion_capo': (songData['posicion_capo'] as num?)?.toInt() ?? 0, // Cast, conversión y valor por defecto
+        'es_favorita': 0, // Por defecto no favorita
+        'contador_reproducciones': 0, // Por defecto 0
+        'fecha_creacion': DateTime.now().toIso8601String(), // Fecha actual
+        'fecha_modificacion': DateTime.now().toIso8601String(), // Fecha actual
+        'notas': (songData['notas'] as String?)?.isNotEmpty == true ? songData['notas'] as String : null, // Cast y manejo de vacío
+        // 'enlaces_video': (songData['enlaces_video'] as List<dynamic>?)?.cast<String>()?.join(','), // Línea problemática original
+        'enlaces_video': _convertVideoLinksToString(songData['enlaces_video']), // Usar función auxiliar
+      });
 
-  // ========== CATEGORY METHODS ==========
-
-  Future<int> insertCategory(Category category) async {
-    final db = await database;
-    return await db.insert('categories', {
-      'name': category.name,
-      'color': category.color,
-      'order_index': category.order,
-      'is_predefined': category.isPredefined ? 1 : 0,
-    });
-  }
-
-  Future<List<Category>> getCategories() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'categories', 
-      orderBy: 'order_index'
-    );
-    
-    return List.generate(maps.length, (i) {
-      return Category(
-        id: maps[i]['id'],
-        name: maps[i]['name'],
-        color: maps[i]['color'],
-        order: maps[i]['order_index'],
-        isPredefined: maps[i]['is_predefined'] == 1,
-      );
-    });
-  }
-
-  Future<Category?> getCategoryById(int id) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'categories',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-    
-    if (maps.isNotEmpty) {
-      return Category(
-        id: maps[0]['id'],
-        name: maps[0]['name'],
-        color: maps[0]['color'],
-        order: maps[0]['order_index'],
-        isPredefined: maps[0]['is_predefined'] == 1,
-      );
+      // 4. Asociar categorías a la canción recién insertada
+      // Cast explícito de la lista de categorías
+      final categories = songData['categorias'] as List<dynamic>?;
+      if (categories != null) {
+        // Iterar sobre la lista de nombres de categorías de la canción
+        for (dynamic catNameDynamic in categories) { // Recibir como dynamic
+          // Cast explícito de cada nombre de categoría a String?
+          String? catName = catNameDynamic as String?;
+          if (catName != null) { // Verificar que no sea nulo
+            // Buscar el ID de la categoría en el mapa obtenido anteriormente
+            final catId = categoryMap[catName];
+            if (catId != null) { // Verificar que la categoría exista en la base de datos
+              // Insertar la relación en la tabla intermedia
+              await db.insert('cancion_categoria', {
+                'cancion_id': songId, // ID de la canción recién insertada
+                'categoria_id': catId, // ID de la categoría asociada
+              });
+            }
+            // Opcional: Loggear si una categoría nombrada no existe
+            // else { print("Advertencia: Categoría '$catName' no encontrada para la canción."); }
+          }
+        }
+      }
     }
-    return null;
   }
 
-  Future<int> updateCategory(Category category) async {
-    final db = await database;
-    return await db.update(
-      'categories',
-      {
-        'name': category.name,
-        'color': category.color,
-        'order_index': category.order,
-      },
-      where: 'id = ?',
-      whereArgs: [category.id],
-    );
-  }
-
-  Future<int> deleteCategory(int id) async {
-    final db = await database;
-    return await db.delete(
-      'categories',
-      where: 'id = ? AND is_predefined = 0',
-      whereArgs: [id],
-    );
-  }
-
-  // ========== SONG-CATEGORY RELATION METHODS ==========
-
-  Future<int> addCategoryToSong(int songId, int categoryId) async {
-    final db = await database;
-    return await db.insert('song_category', {
-      'song_id': songId,
-      'category_id': categoryId,
-    });
-  }
-
-  Future<List<Category>> getCategoriesForSong(int songId) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.rawQuery('''
-      SELECT c.* FROM categories c
-      INNER JOIN song_category sc ON c.id = sc.category_id
-      WHERE sc.song_id = ?
-      ORDER BY c.order_index
-    ''', [songId]);
-    
-    return List.generate(maps.length, (i) {
-      return Category(
-        id: maps[i]['id'],
-        name: maps[i]['name'],
-        color: maps[i]['color'],
-        order: maps[i]['order_index'],
-        isPredefined: maps[i]['is_predefined'] == 1,
-      );
-    });
-  }
-
-  Future<int> removeCategoryFromSong(int songId, int categoryId) async {
-    final db = await database;
-    return await db.delete(
-      'song_category',
-      where: 'song_id = ? AND category_id = ?',
-      whereArgs: [songId, categoryId],
-    );
-  }
-
-  // ========== SETLIST METHODS ==========
-
-  Future<int> insertSetlist(Setlist setlist) async {
-    final db = await database;
-    return await db.insert('setlists', {
-      'name': setlist.name,
-      'event_date': setlist.eventDate?.toIso8601String(),
-      'notes': setlist.notes,
-      'creation_date': setlist.creationDate.toIso8601String(),
-      'modification_date': setlist.modificationDate.toIso8601String(),
-    });
-  }
-
-  Future<List<Setlist>> getSetlists() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'setlists',
-      orderBy: 'creation_date DESC',
-    );
-    
-    return List.generate(maps.length, (i) {
-      return Setlist(
-        id: maps[i]['id'],
-        name: maps[i]['name'],
-        eventDate: maps[i]['event_date'] != null 
-            ? DateTime.parse(maps[i]['event_date'])
-            : null,
-        notes: maps[i]['notes'],
-        creationDate: DateTime.parse(maps[i]['creation_date']),
-        modificationDate: DateTime.parse(maps[i]['modification_date']),
-      );
-    });
-  }
-
-  Future<Setlist?> getSetlistById(int id) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'setlists',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-    
-    if (maps.isNotEmpty) {
-      return Setlist(
-        id: maps[0]['id'],
-        name: maps[0]['name'],
-        eventDate: maps[0]['event_date'] != null 
-            ? DateTime.parse(maps[0]['event_date'])
-            : null,
-        notes: maps[0]['notes'],
-        creationDate: DateTime.parse(maps[0]['creation_date']),
-        modificationDate: DateTime.parse(maps[0]['modification_date']),
-      );
+  // Añadir esta función auxiliar dentro de DatabaseHelper
+  String? _convertVideoLinksToString(dynamic videoLinksData) {
+    if (videoLinksData == null) {
+      return null;
     }
-    return null;
-  }
-
-  Future<int> updateSetlist(Setlist setlist) async {
-    final db = await database;
-    return await db.update(
-      'setlists',
-      {
-        'name': setlist.name,
-        'event_date': setlist.eventDate?.toIso8601String(),
-        'notes': setlist.notes,
-        'modification_date': DateTime.now().toIso8601String(),
-      },
-      where: 'id = ?',
-      whereArgs: [setlist.id],
-    );
-  }
-
-  Future<int> deleteSetlist(int id) async {
-    final db = await database;
-    return await db.delete(
-      'setlists',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-  }
-
-  // ========== SETLIST-SONG RELATION METHODS ==========
-
-  Future<int> addSongToSetlist(int setlistId, int songId, int orderIndex, 
-      {int transposition = 0, int? customCapo}) async {
-    final db = await database;
-    return await db.insert('setlist_songs', {
-      'setlist_id': setlistId,
-      'song_id': songId,
-      'order_index': orderIndex,
-      'transposition_semitones': transposition,
-      'custom_capo': customCapo,
-    });
-  }
-
-  Future<List<SetlistSong>> getSongsForSetlist(int setlistId) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      'setlist_songs',
-      where: 'setlist_id = ?',
-      whereArgs: [setlistId],
-      orderBy: 'order_index',
-    );
-    
-    return List.generate(maps.length, (i) {
-      return SetlistSong(
-        id: maps[i]['id'],
-        setlistId: maps[i]['setlist_id'],
-        songId: maps[i]['song_id'],
-        order: maps[i]['order_index'],
-        transpositionSemitones: maps[i]['transposition_semitones'],
-        customCapo: maps[i]['custom_capo'],
-      );
-    });
-  }
-
-  Future<List<Song>> getSongsWithDetailsForSetlist(int setlistId) async {
-    final db = await database;
-    
-    final List<Map<String, dynamic>> maps = await db.rawQuery('''
-      SELECT s.*, ss.order_index, ss.transposition_semitones, ss.custom_capo
-      FROM setlist_songs ss
-      INNER JOIN songs s ON ss.song_id = s.id
-      WHERE ss.setlist_id = ?
-      ORDER BY ss.order_index
-    ''', [setlistId]);
-    
-    return List.generate(maps.length, (i) {
-      return Song(
-        id: maps[i]['id'],
-        title: maps[i]['title'],
-        artist: maps[i]['artist'],
-        lyricsWithChords: maps[i]['lyrics_with_chords'],
-        originalKey: maps[i]['original_key'],
-        tempoBpm: maps[i]['tempo_bpm'],
-        capoPosition: maps[i]['custom_capo'] ?? maps[i]['capo_position'] ?? 0,
-        isFavorite: maps[i]['is_favorite'] == 1,
-        playCount: maps[i]['play_count'] ?? 0,
-        creationDate: DateTime.parse(maps[i]['creation_date']),
-        modificationDate: DateTime.parse(maps[i]['modification_date']),
-        notes: maps[i]['notes'],
-        videoLinks: maps[i]['video_links'] != null 
-            ? (maps[i]['video_links'] as String).split('||')
-            : null,
-      );
-    });
-  }
-
-  Future<int> updateSetlistSongOrder(int setlistSongId, int newOrder) async {
-    final db = await database;
-    return await db.update(
-      'setlist_songs',
-      {
-        'order_index': newOrder,
-      },
-      where: 'id = ?',
-      whereArgs: [setlistSongId],
-    );
-  }
-
-  Future<int> removeSongFromSetlist(int setlistSongId) async {
-    final db = await database;
-    return await db.delete(
-      'setlist_songs',
-      where: 'id = ?',
-      whereArgs: [setlistSongId],
-    );
-  }
-
-  Future<int> getSetlistSongCount(int setlistId) async {
-    final db = await database;
-    final List<Map<String, dynamic>> result = await db.rawQuery(
-      'SELECT COUNT(*) as count FROM setlist_songs WHERE setlist_id = ?',
-      [setlistId],
-    );
-    return result.first['count'] as int;
-  }
-
-  // ========== UTILITY METHODS ==========
-
-  Future<void> clearDatabase() async {
-    final db = await database;
-    await db.delete('songs');
-    await db.delete('categories');
-    await db.delete('setlists');
-    await db.delete('setlist_songs');
-    await db.delete('song_category');
-    await _insertPredefinedCategories(db);
-  }
-
-  Future<void> close() async {
-    final db = await database;
-    await db.close();
+    if (videoLinksData is List) {
+      try {
+        // Intentar castear la lista a List<String>
+        final stringList = videoLinksData.cast<String>();
+        return stringList.join(',');
+      } catch (e) {
+        // Si el cast falla, puede ser que la lista tenga elementos no String
+        // Opcional: loggear el error o manejarlo de otra manera
+        print("Advertencia: No se pudo convertir enlaces_video a String. Error: $e");
+        return null;
+      }
+    }
+    // Si no es una lista, intentar convertirlo a String
+    return videoLinksData.toString();
   }
 }

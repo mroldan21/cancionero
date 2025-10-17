@@ -1,98 +1,104 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:cancionero_liturgico/models/song.dart';
+import 'package:cancionero_liturgico/services/song_provider.dart';
+import 'package:cancionero_liturgico/services/transposition_service.dart';
 
 class CapoControls extends StatelessWidget {
-  final int capoPosition;
-  final String originalKey;
-  final String currentKey;
-  final ValueChanged<int> onCapoChanged;
+  final Song song;
 
-  const CapoControls({
-    super.key,
-    required this.capoPosition,
-    required this.originalKey,
-    required this.currentKey,
-    required this.onCapoChanged,
-  });
+  const CapoControls({super.key, required this.song});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.all(16.0),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Capotraste',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+    final songProvider = Provider.of<SongProvider>(context);
+
+    return FloatingActionButton(
+      onPressed: () {
+        // Abrir diálogo para seleccionar número de traste
+        showDialog<int>(
+          context: context,
+          builder: (BuildContext context) {
+            int selectedFret = song.capoPosition; // Usar la posición actual como valor inicial
+            return AlertDialog(
+              title: const Text('Usar Capo'),
+              content: StatefulBuilder(
+                builder: (BuildContext context, StateSetter setState) {
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Posición: $capoPosition'),
-                      const SizedBox(height: 8),
+                      const Text('Selecciona el traste:'),
                       Slider(
-                        value: capoPosition.toDouble(),
+                        value: selectedFret.toDouble(),
                         min: 0,
-                        max: 12,
+                        max: 12, // Máximo 12 trastes
                         divisions: 12,
-                        label: capoPosition == 0 ? 'Sin capo' : 'Capo $capoPosition',
+                        label: selectedFret.toString(),
                         onChanged: (value) {
-                          onCapoChanged(value.toInt());
+                          setState(() {
+                            selectedFret = value.round();
+                          });
                         },
                       ),
                     ],
-                  ),
+                  );
+                },
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancelar'),
                 ),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      'Acordes a tocar:',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    Text(
-                      currentKey,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.deepPurple,
+                TextButton(
+                  onPressed: () {
+                    // --- CORRECCIÓN 2: Crear nueva canción con todos los campos requeridos ---
+                    // y sin usar el campo 'category' inexistente.
+                    // Aquí asumimos que el capo se aplica como una transposición equivalente
+                    // al momento de mostrar la canción (en la vista o provider),
+                    // o que se guarda la posición del capo en la canción misma si es permanente.
+                    // Si la intención es guardar el capo *permanentemente* en la canción,
+                    // se debe actualizar el modelo Song para incluir 'capoPosition' y
+                    // usar song.copyWith o crear una nueva instancia con el nuevo capo.
+                    // Para esta corrección, mostramos como crear la instancia con los campos requeridos.
+                    // Suponiendo que la transposición se aplica temporalmente aquí (lo cual puede no ser correcto
+                    // si la intención es guardar el capo como una modificación permanente).
+                    // Si se guarda permanentemente, se debe usar song.copyWith o un nuevo constructor
+                    // que permita cambiar solo el capo.
+                    // Por ahora, creamos una nueva canción con el nuevo capo, manteniendo otros campos.
+                    // Si se aplica capo, se puede transponer la letra *temporalmente* para mostrarla,
+                    // pero la canción original no cambia a menos que se guarde explícitamente.
+                    // Para aplicar capo como transposición temporal:
+                    final transposedContent = TranspositionService.transposeContent(song.content, selectedFret);
+                    final transposedKey = TranspositionService.getTransposedOriginalKey(song.originalKey, selectedFret);
+
+                    songProvider.setSelectedSong(
+                      Song(
+                        id: song.id,
+                        title: song.title,
+                        author: song.author, // Asumiendo que author puede ser nulo
+                        content: transposedContent, // Contenido transpuesto temporalmente
+                        originalKey: transposedKey, // Tonalidad transpuesta temporalmente
+                        tempoBpm: song.tempoBpm,
+                        capoPosition: selectedFret, // Nueva posición de capo
+                        isFavorite: song.isFavorite,
+                        playCount: song.playCount,
+                        creationDate: song.creationDate, // Campo requerido
+                        modificationDate: song.modificationDate, // Campo requerido
+                        notes: song.notes,
+                        videoLinks: song.videoLinks,
+                        // No usar 'category' porque no existe en el modelo Song
                       ),
-                    ),
-                    if (capoPosition > 0)
-                      Text(
-                        'Sonido real: $originalKey',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                  ],
+                    );
+                    Navigator.pop(context, selectedFret);
+                  },
+                  child: const Text('Aplicar'),
                 ),
               ],
-            ),
-            if (capoPosition > 0) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => onCapoChanged(0),
-                  child: const Text('Quitar capo'),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+            );
+          },
+        );
+      },
+      child: const Icon(Icons.straighten),
     );
   }
 }

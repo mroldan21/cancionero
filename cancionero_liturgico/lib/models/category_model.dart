@@ -1,38 +1,35 @@
-// ELIMINAR JSON SERIALIZATION TEMPORALMENTE
 class Category {
   final int? id;
   final String name;
-  final String color;
-  final int order;
-  final bool isPredefined;
+  final String? color; // Nuevo campo
+  final int order;     // Nuevo campo, con valor por defecto
+  final bool isPredefined; // Nuevo campo, con valor por defecto
 
   Category({
     this.id,
     required this.name,
-    this.color = "#4CAF50",
-    this.order = 0,
-    this.isPredefined = false,
+    this.color,           // Puede ser nulo
+    this.order = 0,       // Valor por defecto
+    this.isPredefined = false, // Valor por defecto
   });
 
-  // Convertir a Map para la base de datos
-  Map<String, dynamic> toJson() {
+  Map<String, dynamic> toMap() {
     return {
       'id': id,
       'name': name,
       'color': color,
-      'order_index': order,
-      'is_predefined': isPredefined ? 1 : 0,
+      'order': order,
+      'is_predefined': isPredefined ? 1 : 0, // SQLite no tiene booleano nativo
     };
   }
 
-  // Crear desde Map
-  factory Category.fromJson(Map<String, dynamic> json) {
+  factory Category.fromMap(Map<String, dynamic> map) {
     return Category(
-      id: json['id'],
-      name: json['name'],
-      color: json['color'] ?? "#4CAF50",
-      order: json['order_index'] ?? 0,
-      isPredefined: json['is_predefined'] == 1,
+      id: map['id'] != null ? map['id'] as int : null,
+      name: map['name'] as String,
+      color: map['color'] as String?,
+      order: map['order'] as int? ?? 0,
+      isPredefined: (map['is_predefined'] as int? ?? 0) == 1,
     );
   }
 }

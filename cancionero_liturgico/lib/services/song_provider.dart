@@ -1,239 +1,109 @@
-import 'package:flutter/material.dart';
-import '../models/song.dart';
-import 'song_repository.dart';
+import 'package:flutter/foundation.dart';
+import 'package:cancionero_liturgico/models/song.dart';
+import 'package:cancionero_liturgico/models/setlist.dart'; // Importa SetlistItem
 
 class SongProvider with ChangeNotifier {
-  final SongRepository _repository = SongRepository();
-  List<Song> _songs = [];
-  bool _isLoading = false;
-  String _searchQuery = '';
-  List<Song> _filteredSongs = [];
+  Song? _selectedSong;
+  SetlistItem? _selectedSetlistItem; // Nuevo: para manejar canción con config específica en setlist
+  int _currentSetlistIndex = -1; // Nuevo: índice de la canción actual en el setlist
 
-  List<Song> get songs => _filteredSongs;
-  List<Song> get allSongs => _songs;
-  bool get isLoading => _isLoading;
-  String get searchQuery => _searchQuery;
-
-  SongProvider() {
-    _initializeData();
-  }
-
-  // ✅ CORREGIDO: Usar initializeWithDemoData() en lugar de addSampleSongs()
-  Future<void> _initializeData() async {
-    await _repository.initializeWithDemoData();
-    await loadSongs();
-  }
-
-  // ✅ CORREGIDO: Usar getSongs() en lugar de getAllSongs()
-  Future<void> loadSongs() async {
-    _setLoading(true);
-    try {
-      _songs = await _repository.getSongs();
-      _applySearchFilter();
-      notifyListeners();
-    } catch (e) {
-      print('Error loading songs: $e');
-      // Fallback to demo songs if there's an error
-      _songs = _repository.getDemoSongs();
-      _applySearchFilter();
-      notifyListeners();
-    } finally {
-      _setLoading(false);
+  // Getters para la canción actualmente mostrada/activa
+  Song? get currentSong {
+    // Si hay un SetlistItem seleccionado, devuelve la canción transpuesta/ajustada de ahí
+    if (_selectedSetlistItem != null) {
+      // Opcional: Crear una copia temporal de la canción con el contenido transpuesto
+      // Esto evita modificar el objeto original, pero puede ser ineficiente si se llama frecuentemente.
+      // Una alternativa es calcular la transposición en la vista o en un servicio al mostrarla.
+      // Por ahora, devolvemos la canción original del SetlistItem.
+      // El contenido transpuesto se debería calcular en la vista o en un helper.
+      return _selectedSetlistItem!.song;
     }
+    // Si no hay setlist activo, devuelve la canción seleccionada individualmente
+    return _selectedSong;
   }
 
-  void _setLoading(bool loading) {
-    _isLoading = loading;
+  // Nuevo getter: Transposición aplicada a la canción actual (0 si es individual, personalizada si es de setlist)
+  int get currentTransposition {
+    if (_selectedSetlistItem != null) {
+      return _selectedSetlistItem!.transposition;
+    }
+    // Si se guarda una transposición global temporalmente en SongProvider para canciones individuales:
+    // return _globalTranspositionForSelectedSong ?? 0;
+    // Por ahora, asumimos 0 para canciones individuales no transpuestas globalmente aquí.
+    return 0;
+  }
+
+  // Nuevo getter: Capo aplicado a la canción actual (null si es individual o no se usa, personalizado si es de setlist)
+  int? get currentCapo {
+     if (_selectedSetlistItem != null) {
+      return _selectedSetlistItem!.capo;
+    }
+    // Si se guarda un capo global temporalmente en SongProvider para canciones individuales:
+    // return _globalCapoForSelectedSong;
+    // Por ahora, asumimos null para canciones individuales no configuradas globalmente aquí.
+    return null;
+  }
+
+  // Nuevo getter: Indica si la canción actual forma parte de un setlist
+  bool get isCurrentSongFromSetlist => _selectedSetlistItem != null;
+
+  // Nuevo getter: Nombre del setlist actual (si aplica)
+  String? get currentSetlistName => _selectedSetlistItem?.song.title != null ? _selectedSetlistItem?.song.title : null; // Usar nombre del setlist si está disponible en SetlistItem o se guarda por separado
+
+  // Nuevo getter: Índice de la canción actual en el setlist (si aplica)
+  int get currentSetlistIndex => _currentSetlistIndex;
+
+  // Nuevo getter: Total de canciones en el setlist activo (si aplica)
+  // Este getter requiere que se almacene la lista completa del setlist activo
+  // o que se calcule desde donde se activó el setlist.
+  // Por ahora, lo dejamos como un placeholder o se implementa cuando se maneje el setlist completo en el provider.
+  // int get currentSetlistTotal => _currentSetlist?.songs.length ?? 0;
+
+  // Métodos para seleccionar una canción individual
+  void setSelectedSong(Song? song) {
+    _selectedSong = song;
+    _selectedSetlistItem = null; // Limpiar selección de setlist
+    _currentSetlistIndex = -1; // Reiniciar índice
     notifyListeners();
   }
 
-  void searchSongs(String query) {
-    _searchQuery = query;
-    _applySearchFilter();
+  void clearSelectedSong() {
+    _selectedSong = null;
+    _selectedSetlistItem = null;
+    _currentSetlistIndex = -1;
     notifyListeners();
   }
 
-  void _applySearchFilter() {
-    if (_searchQuery.isEmpty) {
-      _filteredSongs = _songs;
-    } else {
-      final queryLower = _searchQuery.toLowerCase();
-      _filteredSongs = _songs.where((song) {
-        return song.title.toLowerCase().contains(queryLower) ||
-               (song.artist != null && song.artist!.toLowerCase().contains(queryLower)) ||
-               song.lyricsWithChords.toLowerCase().contains(queryLower) ||
-               (song.notes != null && song.notes!.toLowerCase().contains(queryLower));
-      }).toList();
-    }
-  }
-
-  void clearSearch() {
-    _searchQuery = '';
-    _applySearchFilter();
+  // Métodos para seleccionar una canción dentro de un setlist
+  void setSelectedSetlistItem(SetlistItem? item, int index) {
+    _selectedSetlistItem = item;
+    _currentSetlistIndex = index;
+    _selectedSong = null; // Limpiar selección individual
     notifyListeners();
   }
 
-  Future<void> addSong(Song song) async {
-    _setLoading(true);
-    try {
-      await _repository.insertSong(song);
-      await loadSongs(); // Reload to get the updated list
-    } catch (e) {
-      print('Error adding song: $e');
-      // Add to local list as fallback
-      final newId = (_songs.map((s) => s.id ?? 0).reduce((a, b) => a > b ? a : b)) + 1;
-      final newSong = song.copyWith(id: newId);
-      _songs.add(newSong);
-      _applySearchFilter();
-      notifyListeners();
-    } finally {
-      _setLoading(false);
-    }
+  // Nuevo método: Limpiar estado de setlist activo
+  void clearSetlistItem() {
+    _selectedSetlistItem = null;
+    _currentSetlistIndex = -1;
+    // Opcionalmente, si se desea volver a una canción individual previamente seleccionada:
+    // No se limpia _selectedSong aquí a menos que se desee.
+    notifyListeners();
   }
 
-  Future<void> updateSong(Song song) async {
-    _setLoading(true);
-    try {
-      await _repository.updateSong(song);
-      await loadSongs(); // Reload to get the updated list
-    } catch (e) {
-      print('Error updating song: $e');
-      // Update in local list as fallback
-      final index = _songs.indexWhere((s) => s.id == song.id);
-      if (index != -1) {
-        _songs[index] = song;
-        _applySearchFilter();
-        notifyListeners();
-      }
-    } finally {
-      _setLoading(false);
-    }
-  }
+  // Nuevo método: Navegar a la canción anterior en el setlist activo
+  // Este método necesitaría recibir la lista completa del setlist para calcular el índice anterior
+  // y llamar a setSelectedSetlistItem.
+  // void goToPreviousSetlistItem(List<SetlistItem> currentSetlist) {
+  //   if (_currentSetlistIndex > 0 && currentSetlist.length > _currentSetlistIndex) {
+  //     setSelectedSetlistItem(currentSetlist[_currentSetlistIndex - 1], _currentSetlistIndex - 1);
+  //   }
+  // }
 
-  Future<void> deleteSong(int songId) async {
-    _setLoading(true);
-    try {
-      await _repository.deleteSong(songId);
-      await loadSongs(); // Reload to get the updated list
-    } catch (e) {
-      print('Error deleting song: $e');
-      // Remove from local list as fallback
-      _songs.removeWhere((song) => song.id == songId);
-      _applySearchFilter();
-      notifyListeners();
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  Future<void> toggleFavorite(int songId) async {
-    try {
-      await _repository.toggleFavorite(songId);
-      // Update local state immediately for better UX
-      final index = _songs.indexWhere((song) => song.id == songId);
-      if (index != -1) {
-        final song = _songs[index];
-        _songs[index] = song.copyWith(
-          isFavorite: !song.isFavorite,
-          modificationDate: DateTime.now(),
-        );
-        _applySearchFilter();
-        notifyListeners();
-      }
-    } catch (e) {
-      print('Error toggling favorite: $e');
-    }
-  }
-
-  Future<void> incrementPlayCount(int songId) async {
-    try {
-      await _repository.incrementPlayCount(songId);
-      // Update local state immediately for better UX
-      final index = _songs.indexWhere((song) => song.id == songId);
-      if (index != -1) {
-        final song = _songs[index];
-        _songs[index] = song.copyWith(
-          playCount: song.playCount + 1,
-          modificationDate: DateTime.now(),
-        );
-        notifyListeners();
-      }
-    } catch (e) {
-      print('Error incrementing play count: $e');
-    }
-  }
-
-  Future<List<Song>> getFavoriteSongs() async {
-    try {
-      return await _repository.getFavoriteSongs();
-    } catch (e) {
-      print('Error getting favorite songs: $e');
-      return _songs.where((song) => song.isFavorite).toList();
-    }
-  }
-
-  Future<List<Song>> searchSongsFromRepository(String query) async {
-    try {
-      return await _repository.searchSongs(query);
-    } catch (e) {
-      print('Error searching songs: $e');
-      return _filteredSongs;
-    }
-  }
-
-  Future<Song?> getSongById(int id) async {
-    try {
-      return await _repository.getSongById(id);
-    } catch (e) {
-      print('Error getting song by id: $e');
-      return _songs.firstWhere((song) => song.id == id, orElse: () => _songs.first);
-    }
-  }
-
-  Future<Map<String, int>> getStatistics() async {
-    try {
-      return await _repository.getStatistics();
-    } catch (e) {
-      print('Error getting statistics: $e');
-      return {
-        'totalSongs': _songs.length,
-        'favoriteSongs': _songs.where((s) => s.isFavorite).length,
-        'totalPlays': _songs.fold(0, (sum, song) => sum + song.playCount),
-      };
-    }
-  }
-
-  Future<List<Song>> getRecentlyPlayed({int limit = 5}) async {
-    try {
-      return await _repository.getRecentlyPlayed(limit: limit);
-    } catch (e) {
-      print('Error getting recently played: $e');
-      _songs.sort((a, b) => b.playCount.compareTo(a.playCount));
-      return _songs.take(limit).toList();
-    }
-  }
-
-  Future<List<Song>> getNewestSongs({int limit = 5}) async {
-    try {
-      return await _repository.getNewestSongs(limit: limit);
-    } catch (e) {
-      print('Error getting newest songs: $e');
-      _songs.sort((a, b) => b.creationDate.compareTo(a.creationDate));
-      return _songs.take(limit).toList();
-    }
-  }
-
-  // Method to force refresh data
-  Future<void> refresh() async {
-    await loadSongs();
-  }
-
-  // Method to check if songs are loaded
-  bool get hasSongs => _songs.isNotEmpty;
-
-  // Method to get song count
-  int get songCount => _songs.length;
-
-  // Method to get filtered song count
-  int get filteredSongCount => _filteredSongs.length;
+  // Nuevo método: Navegar a la canción siguiente en el setlist activo
+  // void goToNextSetlistItem(List<SetlistItem> currentSetlist) {
+  //   if (_currentSetlistIndex < currentSetlist.length - 1) {
+  //     setSelectedSetlistItem(currentSetlist[_currentSetlistIndex + 1], _currentSetlistIndex + 1);
+  //   }
+  // }
 }

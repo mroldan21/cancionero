@@ -1,109 +1,100 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:cancionero_liturgico/models/song.dart';
+import 'package:cancionero_liturgico/services/song_provider.dart';
+import 'package:cancionero_liturgico/services/transposition_service.dart';
 
 class TranspositionControls extends StatelessWidget {
-  final int currentTransposition;
-  final String originalKey;
-  final String currentKey;
-  final VoidCallback onTransposeUp;
-  final VoidCallback onTransposeDown;
-  final VoidCallback onReset;
+  final Song song; // Parámetro posicional o nombrado, dependiendo de cómo se llame
 
   const TranspositionControls({
     super.key,
-    required this.currentTransposition,
-    required this.originalKey,
-    required this.currentKey,
-    required this.onTransposeUp,
-    required this.onTransposeDown,
-    required this.onReset,
+    required this.song, // Parámetro nombrado requerido
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.all(16.0),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Transposición',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
+    final songProvider = Provider.of<SongProvider>(context);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        FloatingActionButton(
+          heroTag: 'btn_down_${song.id}', // Tag único para evitar conflictos con múltiples instancias
+          onPressed: () {
+            // Disminuir transposición
+            // --- CORRECCIÓN: Crear nueva canción con todos los campos requeridos ---
+            // y sin usar el campo 'category' inexistente.
+            // La transposición se aplica temporalmente aquí para mostrarla.
+            final transposedContent = TranspositionService.transposeContent(song.content, -1);
+            final transposedKey = TranspositionService.getTransposedOriginalKey(song.originalKey, -1);
+
+            songProvider.setSelectedSong(
+              Song(
+                id: song.id,
+                title: song.title,
+                author: song.author, // Asumiendo que author puede ser nulo
+                content: transposedContent, // Contenido transpuesto temporalmente
+                originalKey: transposedKey, // Tonalidad transpuesta temporalmente
+                tempoBpm: song.tempoBpm,
+                capoPosition: song.capoPosition, // Mantener posición de capo original
+                isFavorite: song.isFavorite,
+                playCount: song.playCount,
+                creationDate: song.creationDate, // Campo requerido
+                modificationDate: song.modificationDate, // Campo requerido
+                notes: song.notes,
+                videoLinks: song.videoLinks,
+                // No usar 'category' porque no existe en el modelo Song
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Controles de transposición
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_downward),
-                      onPressed: currentTransposition > -11 ? onTransposeDown : null,
-                      tooltip: 'Bajar semitono',
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[100],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        currentTransposition == 0 
-                            ? 'Original' 
-                            : currentTransposition > 0 
-                                ? '+$currentTransposition' 
-                                : '$currentTransposition',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.arrow_upward),
-                      onPressed: currentTransposition < 11 ? onTransposeUp : null,
-                      tooltip: 'Subir semitono',
-                    ),
-                  ],
-                ),
-                // Información de tonalidad
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      'Tono: $currentKey',
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                    if (currentTransposition != 0)
-                      Text(
-                        'Original: $originalKey',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-            if (currentTransposition != 0) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: onReset,
-                  child: const Text('Resetear a original'),
-                ),
-              ),
-            ],
-          ],
+            );
+          },
+          child: const Icon(Icons.remove),
         ),
-      ),
+        const SizedBox(width: 8),
+        FloatingActionButton(
+          heroTag: 'btn_reset_${song.id}',
+          onPressed: () {
+            // Resetear a la canción original
+            songProvider.clearSelectedSong(); // Esto podría no ser suficiente si el estado de la canción original no se restaura
+            // O bien, se podría pasar la canción original como estado inicial o manejarla en SongProvider
+            // Por ahora, simplemente selecciona la canción original
+            songProvider.setSelectedSong(song);
+          },
+          child: const Icon(Icons.refresh),
+        ),
+        const SizedBox(width: 8),
+        FloatingActionButton(
+          heroTag: 'btn_up_${song.id}',
+          onPressed: () {
+            // Aumentar transposición
+            // --- CORRECCIÓN: Crear nueva canción con todos los campos requeridos ---
+            // y sin usar el campo 'category' inexistente.
+            // La transposición se aplica temporalmente aquí para mostrarla.
+            final transposedContent = TranspositionService.transposeContent(song.content, 1);
+            final transposedKey = TranspositionService.getTransposedOriginalKey(song.originalKey, 1);
+
+            songProvider.setSelectedSong(
+              Song(
+                id: song.id,
+                title: song.title,
+                author: song.author, // Asumiendo que author puede ser nulo
+                content: transposedContent, // Contenido transpuesto temporalmente
+                originalKey: transposedKey, // Tonalidad transpuesta temporalmente
+                tempoBpm: song.tempoBpm,
+                capoPosition: song.capoPosition, // Mantener posición de capo original
+                isFavorite: song.isFavorite,
+                playCount: song.playCount,
+                creationDate: song.creationDate, // Campo requerido
+                modificationDate: song.modificationDate, // Campo requerido
+                notes: song.notes,
+                videoLinks: song.videoLinks,
+                // No usar 'category' porque no existe en el modelo Song
+              ),
+            );
+          },
+          child: const Icon(Icons.add),
+        ),
+      ],
     );
   }
 }

@@ -1,275 +1,98 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/song.dart';
-import '../services/database_helper.dart';
-import 'song_edit_screen.dart';
-import 'presentation_mode_screen.dart';
-import '../services/song_repository.dart'; // ✅ IMPORTAR SongRepository
-import '../widgets/song_item.dart';
+import 'package:cancionero_liturgico/models/song.dart';
+import 'package:cancionero_liturgico/services/song_repository.dart';
+import 'package:cancionero_liturgico/screens/song_detail_screen.dart';
+import 'package:cancionero_liturgico/screens/song_edit_screen.dart';
+import 'package:cancionero_liturgico/widgets/song_item.dart';
+import 'package:cancionero_liturgico/services/category_repository.dart'; // Añadir esta línea
 
-class SongListScreen extends StatefulWidget {
-  const SongListScreen({Key? key}) : super(key: key);
+class SongListScreen extends StatelessWidget {
+  final int? categoryId; // Si es null, mostrar todas las canciones o aplicar filtros
 
-  @override
-  State<SongListScreen> createState() => _SongListScreenState();
-}
-
-class _SongListScreenState extends State<SongListScreen> {
-  final DatabaseHelper _dbHelper = DatabaseHelper();
-  final SongRepository _songRepository = SongRepository(); // ✅ INSTANCIAR Repository
-  List<Song> _songs = [];
-  List<Song> _filteredSongs = [];
-  bool _isLoading = true;
-  String _searchQuery = '';
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSongs();
-  }
-
-  Future<void> _loadSongs() async {
-    setState(() {
-      _isLoading = true;
-    });
-    
-    try {
-      _songs = await _dbHelper.getSongs();
-      _filteredSongs = _songs;
-    } catch (e) {
-      print("Error loading songs: $e");
-      // Show error message to user
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error loading songs: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  void _searchSongs(String query) {
-    setState(() {
-      _searchQuery = query;
-      if (query.isEmpty) {
-        _filteredSongs = _songs;
-      } else {
-        _filteredSongs = _songs.where((song) {
-          final title = song.title.toLowerCase();
-          final artist = song.artist?.toLowerCase() ?? '';
-          final searchLower = query.toLowerCase();
-          return title.contains(searchLower) || artist.contains(searchLower);
-        }).toList();
-      }
-    });
-  }
-
-  void _addNewSong() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => SongEditScreen(),
-      ),
-    ).then((_) => _loadSongs());
-  }
-
-  void _editSong(Song song) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => SongEditScreen(song: song),
-      ),
-    ).then((_) => _loadSongs());
-  }
-
-  // ✅ CORREGIDO: Método _toggleFavorite correctamente implementado
-  void _toggleFavorite(Song song) async {
-    try {
-      await _songRepository.toggleFavorite(song.id!);
-      await _loadSongs(); // Recargar para ver el cambio
-    } catch (e) {
-      print("Error toggling favorite: $e");
-    }
-  }
-
-  
-  void _deleteSong(Song song) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Song'),
-        content: Text('Are you sure you want to delete "${song.title}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              try {
-                await _dbHelper.deleteSong(song.id!);
-                await _loadSongs();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('"${song.title}" deleted successfully'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error deleting song: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openPresentationMode(Song song) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PresentationModeScreen(song: song),
-      ),
-    );
-  }
+  const SongListScreen({super.key, this.categoryId});
 
   @override
   Widget build(BuildContext context) {
+    final songRepository = Provider.of<SongRepository>(context, listen: false);
+    final categoryRepository = Provider.of<CategoryRepository>(context, listen: false);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Songs'),
+        title: Text(categoryId != null ? 'Canciones' : 'Todas las Canciones'),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: _addNewSong,
-            tooltip: 'Add New Song',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SongEditScreen()),
+              );
+            },
           ),
         ],
       ),
       body: Column(
         children: [
-          // Search Bar
+          // Campo de búsqueda
           Padding(
-            padding: const EdgeInsets.all(16.0),
+            padding: const EdgeInsets.all(8.0),
             child: TextField(
+              onChanged: (query) {
+                // Manejar búsqueda en tiempo real aquí o en un widget separado
+                // Actualizar la lista de canciones mostradas
+              },
               decoration: const InputDecoration(
-                hintText: 'Search songs...',
+                hintText: 'Buscar canciones...',
                 prefixIcon: Icon(Icons.search),
                 border: OutlineInputBorder(),
               ),
-              onChanged: _searchSongs,
             ),
           ),
-          // Songs List
+          // Lista de canciones
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredSongs.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.music_note,
-                              size: 64,
-                              color: Colors.grey[400],
+            child: FutureBuilder<List<Song>>(
+              future: categoryId != null
+                  ? songRepository.getSongsByCategory(categoryId!)
+                  : songRepository.getAllSongs(), // Por ahora, sin filtro de búsqueda activo
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                } else {
+                  final songs = snapshot.data ?? [];
+                  return ListView.builder(
+                    itemCount: songs.length,
+                    itemBuilder: (context, index) {
+                      final song = songs[index];
+                      return SongItem(
+                        song: song,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SongDetailScreen(song: song),
                             ),
-                            const SizedBox(height: 16),
-                            Text(
-                              _searchQuery.isEmpty
-                                  ? 'No songs yet\nTap + to add your first song'
-                                  : 'No songs found for "$_searchQuery"',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : ListView.builder(
-                        itemCount: _filteredSongs.length,
-                        itemBuilder: (context, index) {
-                          final song = _filteredSongs[index];
-                          return SongItem(
-                            song: song,
-                            onTap: () => _editSong(song),
-                            onEdit: () => _editSong(song),
-                            onToggleFavorite: () => _toggleFavorite(song), // ✅ CORREGIDO
-                            onDelete: () => _deleteSong(song), // ✅ CORREGIDO
                           );
                         },
-                      ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addNewSong,
-        child: const Icon(Icons.add),
-        tooltip: 'Add New Song',
-      ),
-    );
-  }
-
-  Widget _buildSongCard(Song song) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: ListTile(
-        leading: const Icon(Icons.music_note),
-        title: Text(
-          song.title,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        subtitle: song.artist != null ? Text(song.artist!) : null,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Presentation Mode Button
-            IconButton(
-              icon: const Icon(Icons.slideshow),
-              onPressed: () => _openPresentationMode(song),
-              tooltip: 'Presentation Mode',
-              color: Colors.blue,
-            ),
-            // Favorite Indicator
-            if (song.isFavorite)
-              const Icon(Icons.favorite, color: Colors.red, size: 20),
-            // More Options
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'edit') {
-                  _editSong(song);
-                } else if (value == 'delete') {
-                  _deleteSong(song);
+                        onLongPress: () {
+                          // Opción de edición en presión larga
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SongEditScreen(song: song),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  );
                 }
               },
-              itemBuilder: (context) => [
-                const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                const PopupMenuItem(value: 'delete', child: Text('Delete')),
-              ],
             ),
-          ],
-        ),
-        onTap: () => _editSong(song),
+          ),
+        ],
       ),
     );
   }

@@ -34,8 +34,11 @@ dependencies:
   sqflite: ^2.3.0
   path: ^1.8.3
   provider: ^6.1.1
-  wakelock_plus: ^1.1.0  # Add this line for screen wake lock
   json_annotation: ^4.8.1
+  shared_preferences: ^2.2.2 # Asegúrate de usar la última versión compatible
+
+  # También necesitas wakelock_plus para el modo presentación
+  wakelock_plus: ^1.2.5
   
 
 dev_dependencies:
