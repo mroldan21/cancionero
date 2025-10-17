@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cancionero_liturgico/models/category_model.dart';
+import 'package:cancionero_liturgico/models/category.dart';
 import 'package:cancionero_liturgico/services/category_repository.dart';
 import 'package:cancionero_liturgico/screens/song_list_screen.dart';
 
