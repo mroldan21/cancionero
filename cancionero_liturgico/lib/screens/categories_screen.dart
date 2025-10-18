@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cancionero_liturgico/models/category.dart';
 import 'package:cancionero_liturgico/services/category_repository.dart';
+import 'package:cancionero_liturgico/services/song_repository.dart';
 import 'package:cancionero_liturgico/screens/song_list_screen.dart';
 
 class CategoriesScreen extends StatefulWidget {
@@ -89,10 +90,23 @@ class _CategoryListView extends StatelessWidget {
                 ),
                 title: Text(category.name),
                 subtitle: category.isPredefined ? const Text('Categoría predefinida', style: TextStyle(fontSize: 12)) : null,
-                trailing: Text(
-                  '(${category.order})', // Mostrar orden si es predefinida
-                  style: const TextStyle(fontSize: 12),
-                ),
+                trailing: FutureBuilder<int>(
+                  // MEJORA: Obtener y mostrar la cantidad de canciones por categoría
+                  future: Provider.of<SongRepository>(context, listen: false).getSongCountForCategory(category.id!),
+                  builder: (context, countSnapshot) {
+                    if (countSnapshot.connectionState == ConnectionState.waiting) {
+                      return const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2));
+                    } else if (countSnapshot.hasData) {
+                      return Text(
+                        '${countSnapshot.data} canciones',
+                        style: TextStyle(fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color),
+                      );
+                    } else {
+                      // En caso de error o sin datos, no mostrar nada
+                      return const SizedBox.shrink();
+                    }
+                  },
+                ), 
                 onTap: () {
                   // Navegar a una lista de canciones filtradas por esta categoría
                   Navigator.push(

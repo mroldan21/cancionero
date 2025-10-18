@@ -6,7 +6,7 @@ import 'package:cancionero_liturgico/models/song.dart';
 import 'package:cancionero_liturgico/services/song_provider.dart';
 import 'package:cancionero_liturgico/services/theme_provider.dart';
 import 'package:cancionero_liturgico/services/transposition_service.dart';
-import 'package:cancionero_liturgico/widgets/chord_text.dart';
+import 'package:cancionero_liturgico/widgets/song_content_view.dart'; // MEJORA: Usar el nuevo widget optimizado
 import 'package:cancionero_liturgico/utils/scroll_controller.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:cancionero_liturgico/services/song_repository.dart';
@@ -96,63 +96,73 @@ class _PresentationScreenState extends State<PresentationScreen> {
     return Scaffold(
       backgroundColor: themeProvider.isDarkMode ? Colors.black : Colors.white,
       body: Stack(
-        children: [
-          // Main content
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          widget.song.title,
-                          style: TextStyle(fontSize: _fontSize * 0.8, fontWeight: FontWeight.bold, color: themeProvider.isDarkMode ? Colors.white : Colors.black),
+        children: [          // Main content
+          GestureDetector(
+            // MEJORA: Navegación por swipe horizontal
+            onHorizontalDragEnd: (details) {
+              if (details.primaryVelocity == 0) return; // No swipe
+              if (details.primaryVelocity! < 0) {
+                // Swipe a la izquierda -> Siguiente canción
+                widget.onNextSong?.call();
+              } else if (details.primaryVelocity! > 0) {
+                // Swipe a la derecha -> Canción anterior
+                widget.onPreviousSong?.call();
+              }
+            },
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.song.title,
+                            style: TextStyle(fontSize: _fontSize * 0.8, fontWeight: FontWeight.bold, color: themeProvider.isDarkMode ? Colors.white : Colors.black),
+                          ),
                         ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: Colors.red),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
-                    ],
-                  ),
-                  Text(
-                    'Tono: $displayedKey | Capo: ${_capoFret != 0 ? 'Traste $_capoFret' : 'No'}',
-                    style: TextStyle(fontSize: _fontSize * 0.6, color: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey[600]),
-                  ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: Scrollbar(
-                      controller: _scrollController,
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () {
-                          if (_showControls) {
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.red),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      'Tono: $displayedKey | Capo: ${_capoFret != 0 ? 'Traste $_capoFret' : 'No'}',
+                      style: TextStyle(fontSize: _fontSize * 0.6, color: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey[600]),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: Scrollbar(
+                        controller: _scrollController,
+                        child: GestureDetector( // Envuelve el SingleChildScrollView para capturar todos los gestos
+                          // MEJORA: Ocultar el panel con cualquier interacción sobre el área de la canción
+                          onTap: () => setState(() => _showControls = false),
+                          onPanDown: (_) => setState(() => _showControls = false),
+                          onScaleStart: (details) {
+                            _baseFontSize = _fontSize;
+                            setState(() => _showControls = false);
+                          },
+                          onScaleUpdate: (details) {
                             setState(() {
-                              _showControls = false;
+                              _fontSize = (_baseFontSize * details.scale).clamp(12.0, 64.0);
+                              if (_dependenciesInitialized) {
+                                _scrollAutoController.setFontSize(_fontSize);
+                              }
                             });
-                          }
-                        },
-                        onScaleStart: (details) => _baseFontSize = _fontSize,
-                        onScaleUpdate: (details) {
-                          setState(() {
-                            _fontSize = (_baseFontSize * details.scale).clamp(12.0, 64.0);
-                            if (_dependenciesInitialized) {
-                              _scrollAutoController.setFontSize(_fontSize);
-                            }
-                          });
-                        },
-                        child: SingleChildScrollView(
-                          controller: _scrollController,
-                          child: ChordText(transposedContent, fontSize: _fontSize),
+                          },
+                          child: SingleChildScrollView( // El contenido scrolleable
+                            controller: _scrollController,
+                            child: SongContentView(text: transposedContent, fontSize: _fontSize), // MEJORA: Usar el nuevo widget
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -226,7 +236,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
             top: MediaQuery.of(context).size.height / 2 - 30,
             right: _showControls ? 200 : 10,
             child: FloatingActionButton(
-              mini: true,
+              heroTag: 'toggleControls', // Añadir heroTag para evitar conflictos
               backgroundColor: Colors.black.withOpacity(0.5),
               onPressed: () => setState(() => _showControls = !_showControls),
               child: Icon(_showControls ? Icons.arrow_forward_ios : Icons.arrow_back_ios, size: 18),
@@ -238,6 +248,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
             bottom: 30,
             right: 16,
             child: FloatingActionButton(
+              heroTag: 'playPause', // Añadir heroTag para evitar conflictos
               onPressed: _toggleAutoScroll,
               child: Icon(_isScrollingAutomatically ? Icons.pause : Icons.play_arrow),
             ),

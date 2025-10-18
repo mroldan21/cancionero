@@ -61,6 +61,9 @@ class SongProvider with ChangeNotifier {
 
   // Métodos para seleccionar una canción individual
   void setSelectedSong(Song? song) {
+    // Optimización: No notificar si la canción seleccionada es la misma.
+    if (_selectedSong == song) return;
+
     _selectedSong = song;
     _selectedSetlistItem = null; // Limpiar selección de setlist
     _currentSetlistIndex = -1; // Reiniciar índice
@@ -68,6 +71,9 @@ class SongProvider with ChangeNotifier {
   }
 
   void clearSelectedSong() {
+    // Optimización: Solo notificar si realmente había una canción seleccionada.
+    if (_selectedSong == null && _selectedSetlistItem == null) return;
+
     _selectedSong = null;
     _selectedSetlistItem = null;
     _currentSetlistIndex = -1;
@@ -76,6 +82,9 @@ class SongProvider with ChangeNotifier {
 
   // Métodos para seleccionar una canción dentro de un setlist
   void setSelectedSetlistItem(SetlistItem? item, int index) {
+    // Optimización: No notificar si el ítem del setlist es el mismo.
+    if (_selectedSetlistItem == item && _currentSetlistIndex == index) return;
+
     _selectedSetlistItem = item;
     _currentSetlistIndex = index;
     _selectedSong = null; // Limpiar selección individual
