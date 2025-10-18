@@ -141,11 +141,12 @@ class SongRepository {
     return null;
   }
 
-  Future<void> insertSong(Song song) async {
+  Future<int> insertSong(Song song) async {
     final db = await _databaseHelper.database;
-    await db.transaction((txn) async {
-      final songId = await txn.insert('songs', song.toMap());
+    final int songId = await db.transaction((txn) async {
+      return await txn.insert('songs', song.toMap());
     });
+    return songId;
   }
 
   Future<void> updateSong(Song song) async {

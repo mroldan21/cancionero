@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/song.dart';
 import '../services/song_repository.dart';
+import 'package:cancionero_liturgico/models/category.dart';
+import 'package:cancionero_liturgico/services/category_repository.dart';
 
 class SongEditScreen extends StatefulWidget {
   // La canción es opcional. Si es null, es una nueva canción.
@@ -24,10 +26,29 @@ class _SongEditScreenState extends State<SongEditScreen> {
   late TextEditingController _contentController;
   late TextEditingController _notesController;
   late TextEditingController _videoLinksController;
+  
+  // Nuevas variables de estado para las categorías
+  List<Category> _allCategories = [];
+  Set<int> _selectedCategoryIds = {};
+  bool _isLoadingCategories = true;
 
   @override
   void initState() {
     super.initState();
+    _loadInitialData();
+  }
+
+  Future<void> _loadInitialData() async {
+    final categoryRepo = Provider.of<CategoryRepository>(context, listen: false);
+    final songRepo = Provider.of<SongRepository>(context, listen: false);
+
+    final categories = await categoryRepo.getAllCategories();
+    final songCategoryIds = widget.song?.id != null
+        ? await songRepo.getCategoriaIdsForSong(widget.song!.id!)
+        : <int>[];
+
+    if (!mounted) return;
+
     // Si estamos editando, rellenar los campos. Si no, se quedan vacíos.
     _titleController = TextEditingController(text: widget.song?.title ?? '');
     _authorController = TextEditingController(text: widget.song?.author ?? '');
@@ -37,6 +58,12 @@ class _SongEditScreenState extends State<SongEditScreen> {
     _contentController = TextEditingController(text: widget.song?.content ?? '');
     _notesController = TextEditingController(text: widget.song?.notes ?? '');
     _videoLinksController = TextEditingController(text: widget.song?.videoLinks?.join(', ') ?? '');
+
+    setState(() {
+      _allCategories = categories;
+      _selectedCategoryIds = Set.from(songCategoryIds);
+      _isLoadingCategories = false;
+    });
   }
 
   @override
@@ -56,6 +83,7 @@ class _SongEditScreenState extends State<SongEditScreen> {
     if (_formKey.currentState!.validate()) {
       try {
         final songRepository = Provider.of<SongRepository>(context, listen: false);
+        int songId;
         
         // Crear o actualizar la canción
         final songToSave = Song(
@@ -77,10 +105,13 @@ class _SongEditScreenState extends State<SongEditScreen> {
         );
 
         if (songToSave.id != null) {
+          songId = songToSave.id!;
           await songRepository.updateSong(songToSave);
         } else {
-          await songRepository.insertSong(songToSave);
+          songId = await songRepository.insertSong(songToSave);
         }
+
+        await songRepository.setCategoriasForSong(songId, _selectedCategoryIds.toList());
         Navigator.of(context).pop(true); // Devuelve 'true' para indicar éxito
         
       } catch (e) {
@@ -232,7 +263,45 @@ class _SongEditScreenState extends State<SongEditScreen> {
                 ),
               ),
 
-              // TODO: Añadir selector de categorías aquí
+              const SizedBox(height: 24),
+              Text(
+                'Categorías',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[700],
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _isLoadingCategories
+                  ? const Center(child: CircularProgressIndicator())
+                  : Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade400),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Wrap(
+                        spacing: 8.0,
+                        runSpacing: 4.0,
+                        children: _allCategories.map((category) {
+                          final isSelected = _selectedCategoryIds.contains(category.id);
+                          return ChoiceChip(
+                            label: Text(category.name),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setState(() {
+                                if (selected) {
+                                  _selectedCategoryIds.add(category.id!);
+                                } else {
+                                  _selectedCategoryIds.remove(category.id!);
+                                }
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ),
               SizedBox(height: 24),
 
               // Botones de acción
