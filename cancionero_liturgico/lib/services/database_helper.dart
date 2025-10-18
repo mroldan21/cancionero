@@ -15,10 +15,11 @@ class DatabaseHelper {
   }
 
   Future<Database> _initDatabase() async {
+    print("[DB] _initDatabase: Abriendo la base de datos...");
     String path = join(await getDatabasesPath(), 'cancionero.db');
     return await openDatabase(
       path,
-      version: 2, // Incrementar versión para permitir migración
+      version: 3, // Incrementar versión para forzar la recreación
       onCreate: _onCreate,
       onUpgrade: _onUpgrade, // Añadir callback de actualización
     );
@@ -26,26 +27,33 @@ class DatabaseHelper {
 
   // Nueva función para manejar actualizaciones de versión
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // Este es un ejemplo simple para la migración de v1 a v2
-    // En aplicaciones reales, las migraciones deben ser más robustas y específicas por versión
-    if (oldVersion < 2) {
-      // Eliminar tablas antiguas si existen (esto borrará datos existentes)
-      await db.execute('DROP TABLE IF EXISTS categories;');
-      await db.execute('DROP TABLE IF EXISTS songs;');
-      await db.execute('DROP TABLE IF EXISTS cancion_categoria;');
-      await db.execute('DROP TABLE IF EXISTS setlists;');
-      await db.execute('DROP TABLE IF EXISTS setlist_cancion;');
-      await db.execute('DROP TABLE IF EXISTS configuracion;');
+    print("[DB] _onUpgrade: Actualizando la base de datos de v$oldVersion a v$newVersion.");
+    // Para desarrollo, una estrategia simple es borrar y recrear la BD.
+    // ADVERTENCIA: Esto borrará todos los datos existentes.
+    if (oldVersion < newVersion) {
+      print("[DB] _onUpgrade: Borrando todas las tablas existentes.");
 
-      // Crear tablas nuevas según el modelo de datos actualizado
-      await _createTables(db);
+      // Lista de todas las tablas para asegurar que se borren todas.
+      const tables = [
+        'cancion_categoria',
+        'setlist_cancion',
+        'categories',
+        'songs',
+        'setlists',
+        'configuracion'
+      ];
 
-      // Insertar datos semilla (categorías predefinidas y canciones de ejemplo)
-      await _insertSeedData(db);
+      for (final table in tables) {
+        await db.execute('DROP TABLE IF EXISTS $table;');
+      }
+
+      // Recrear la base de datos desde cero.
+      await _onCreate(db, newVersion);
     }
   }
 
   Future<void> _onCreate(Database db, int version) async {
+    print("[DB] _onCreate: Creando tablas y datos semilla para la versión $version.");
     // Crear tablas según el modelo de datos actualizado
     await _createTables(db);
 
@@ -55,6 +63,7 @@ class DatabaseHelper {
 
   // Función auxiliar para crear todas las tablas
   Future<void> _createTables(Database db) async {
+    print("[DB] _createTables: Creando las tablas...");
     // Tabla de Categorías
     await db.execute('''
       CREATE TABLE categories (
@@ -143,19 +152,20 @@ class DatabaseHelper {
     await db.execute('CREATE INDEX idx_fecha_evento_setlist ON setlists (fecha_evento);');
     await db.execute('CREATE INDEX idx_setlist_cancion_setlist ON setlist_cancion (setlist_id);');
     await db.execute('CREATE INDEX idx_setlist_cancion_orden ON setlist_cancion (setlist_id, orden);');
+    print("[DB] _createTables: Tablas creadas exitosamente.");
   }
 
   // Función auxiliar para insertar datos semilla
   Future<void> _insertSeedData(Database db) async {
+    print("[DB] _insertSeedData: Insertando datos semilla...");
     // Verificar si ya existen categorías (para evitar duplicados en reinicios)
     final categoryCountResult = await db.rawQuery('SELECT COUNT(*) as count FROM categories');
     final categoryCount = Sqflite.firstIntValue(categoryCountResult) ?? 0;
 
     if (categoryCount == 0) {
-      print("Insertando categorías predefinidas...");
       await _insertPredefinedCategories(db);
     } else {
-      print("Categorías ya existen ($categoryCount), omitiendo inserción.");
+      print("[DB] _insertSeedData: Categorías ya existen ($categoryCount), omitiendo inserción.");
     }
 
     // Verificar si ya existen canciones (para evitar duplicados en reinicios)
@@ -163,15 +173,15 @@ class DatabaseHelper {
     final songCount = Sqflite.firstIntValue(songCountResult) ?? 0;
 
     if (songCount == 0) {
-      print("Insertando canciones de ejemplo...");
       await _insertExampleSongs(db);
     } else {
-      print("Canciones ya existen ($songCount), omitiendo inserción.");
+      print("[DB] _insertSeedData: Canciones ya existen ($songCount), omitiendo inserción.");
     }
   }
 
   // Función auxiliar para insertar categorías predefinidas
   Future<void> _insertPredefinedCategories(Database db) async {
+    print("[DB] _insertPredefinedCategories: Insertando categorías predefinidas...");
     final predefinedCategories = [
       {'nombre': 'Entrada', 'color': '#4CAF50', 'orden': 1},
       {'nombre': 'Meditación', 'color': '#2196F3', 'orden': 2},
@@ -192,12 +202,14 @@ class DatabaseHelper {
         'es_predefinida': 1, // Marcado como predefinido
       });
     }
+    print("[DB] _insertPredefinedCategories: ${predefinedCategories.length} categorías insertadas.");
   }
 
   
   // Función auxiliar para insertar canciones de ejemplo
   // lib/services/database_helper.dart
   Future<void> _insertExampleSongs(Database db) async {
+    print("[DB] _insertExampleSongs: Insertando canciones de ejemplo...");
     // 1. Obtener IDs de categorías predefinidas para asociarlas
     Map<String, int> categoryMap = {};
     final categoryResults = await db.query('categories', columns: ['id', 'nombre']);
@@ -257,7 +269,7 @@ class DatabaseHelper {
       {
         "titulo": "Salida en Gloria",
         "autor": "Luis González",
-        "letra_con_acordes": "    D              A              Bm             G\nSalgamos del templo, con Cristo en el corazón\n    D              A              Bm             G\nLlevemos su luz al mundo, con amor y devoción\n\n    A              G              D              A\nQue el Señor nos bendiga, nos guíe y nos proteja\n    A              G              D              A\nY que su paz nos llene, cada día de nuestra vida",
+        "letra_con_acordes": "    D              A              Bm             G\nSalgamos del templo, con Cristo en el corazón\n    D              A              Bm             G\nLlevemos su luz al mundo, con amor y devoción\n\n    A              G              D              A\nQue el Señor nos bendiga, nos guíe y nos proteja\n    A              G              D              A\nY que su paz nos llene, cada día de nuestra vida    D              A              Bm             G\nSalgamos del templo, con Cristo en el corazón\n    D              A              Bm             G\nLlevemos su luz al mundo, con amor y devoción\n\n    A              G              D              A\nQue el Señor nos bendiga, nos guíe y nos proteja\n    A              G              D              A\nY que su paz nos llene, cada día de nuestra vida    D              A              Bm             G\nSalgamos del templo, con Cristo en el corazón\n    D              A              Bm             G\nLlevemos su luz al mundo, con amor y devoción\n\n    A              G              D              A\nQue el Señor nos bendiga, nos guíe y nos proteja\n    A              G              D              A\nY que su paz nos llene, cada día de nuestra vida",
         "tonalidad_original": "D",
         "tempo_bpm": 95,
         "posicion_capo": 0,
@@ -311,6 +323,7 @@ class DatabaseHelper {
         }
       }
     }
+    print("[DB] _insertExampleSongs: ${exampleSongs.length} canciones de ejemplo insertadas.");
   }
 
   // Añadir esta función auxiliar dentro de DatabaseHelper

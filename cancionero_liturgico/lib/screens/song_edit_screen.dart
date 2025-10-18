@@ -27,7 +27,7 @@ class _SongEditScreenState extends State<SongEditScreen> {
   late String _tempVideoLink = ''; // Campo temporal para ingresar un nuevo enlace
 
   List<Category> _allCategories = [];
-  List<int> _selectedCategoryIds = []; // IDs de categorías seleccionadas
+  final List<int> _selectedCategoryIds = []; // IDs de categorías seleccionadas
 
   @override
   void initState() {
@@ -267,7 +267,7 @@ class _SongEditScreenState extends State<SongEditScreen> {
                           },
                         ),
                       ),
-                    )).toList(),
+                    )),
                 // Campo para agregar nuevo enlace de video
                 Row(
                   children: [

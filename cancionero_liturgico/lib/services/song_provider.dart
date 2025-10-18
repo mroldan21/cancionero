@@ -48,7 +48,7 @@ class SongProvider with ChangeNotifier {
   bool get isCurrentSongFromSetlist => _selectedSetlistItem != null;
 
   // Nuevo getter: Nombre del setlist actual (si aplica)
-  String? get currentSetlistName => _selectedSetlistItem?.song.title != null ? _selectedSetlistItem?.song.title : null; // Usar nombre del setlist si está disponible en SetlistItem o se guarda por separado
+  String? get currentSetlistName => _selectedSetlistItem?.song.title; // Usar nombre del setlist si está disponible en SetlistItem o se guarda por separado
 
   // Nuevo getter: Índice de la canción actual en el setlist (si aplica)
   int get currentSetlistIndex => _currentSetlistIndex;

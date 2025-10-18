@@ -42,7 +42,7 @@ class ScrollAutoController {
     // Suposición: ~4 compases por línea, 4/4, tempo en negras
     const compasesPorLinea = 2.0;
     const negrasPorCompas = 4.0;
-    final duracionEstimadaSegundos = (_totalLines * compasesPorLinea * negrasPorCompas) / (_songTempoBpm!.toDouble() / 60.0);
+    final duracionEstimadaSegundos = (_totalLines * compasesPorLinea * negrasPorCompas) / (_songTempoBpm.toDouble() / 60.0);
 
     // Altura promedio de una línea según tamaño de fuente
     final lineHeight = _getAverageLineHeight();

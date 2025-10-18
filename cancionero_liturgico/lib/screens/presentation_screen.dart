@@ -97,7 +97,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
                 ],
               ),
               Text(
-                'Tono: $displayedKey${currentTransposition != 0 ? ' (+${currentTransposition})' : ''} | Capo: ${currentCapo != 0 ? 'Traste $currentCapo' : 'No'}',
+                'Tono: $displayedKey${currentTransposition != 0 ? ' (+$currentTransposition)' : ''} | Capo: ${currentCapo != 0 ? 'Traste $currentCapo' : 'No'}',
                 style: TextStyle(fontSize: _fontSize * 0.6, color: themeProvider.isDarkMode ? Colors.grey[400] : Colors.grey[600]),
               ),
               const SizedBox(height: 8),

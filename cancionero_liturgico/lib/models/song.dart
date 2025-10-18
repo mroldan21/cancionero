@@ -43,7 +43,7 @@ class Song {
       'fecha_creacion': creationDate.toIso8601String(), // Almacenar como string ISO
       'fecha_modificacion': modificationDate.toIso8601String(), // Almacenar como string ISO
       'notas': notes,
-      'enlaces_video': videoLinks != null ? videoLinks!.join(',') : null, // Almacenar como string CSV
+      'enlaces_video': videoLinks?.join(','), // Almacenar como string CSV
     };
   }
 
