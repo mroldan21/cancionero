@@ -15,8 +15,6 @@ class PresentationModeScreen extends StatelessWidget {
 
     if (setlist != null && setlist!.songs.isNotEmpty) {
       // Si se proporciona un setlist, iniciar reproducción del setlist
-      // Esto implica manejar la navegación entre canciones del setlist
-      // y posiblemente iniciar el scroll automático si está configurado
       return _SetlistPresentationController(setlist: setlist!);
     } else {
       // Si no hay setlist, verificar si hay una canción individual seleccionada
@@ -26,7 +24,7 @@ class PresentationModeScreen extends StatelessWidget {
           body: Center(child: Text('Selecciona una canción o un setlist para presentar')),
         );
       }
-      // Presentar la canción individual
+      // Presentar la canción individual (sin callbacks de next/previous)
       return PresentationScreen(song: selectedSong);
     }
   }
@@ -45,6 +43,22 @@ class _SetlistPresentationController extends StatefulWidget {
 class _SetlistPresentationControllerState extends State<_SetlistPresentationController> {
   int _currentIndex = 0;
 
+  void _nextSong() {
+    if (_currentIndex < widget.setlist.songs.length - 1) {
+      setState(() {
+        _currentIndex++;
+      });
+    }
+  }
+
+  void _previousSong() {
+    if (_currentIndex > 0) {
+      setState(() {
+        _currentIndex--;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.setlist.songs.isEmpty) {
@@ -56,20 +70,17 @@ class _SetlistPresentationControllerState extends State<_SetlistPresentationCont
     final currentItem = widget.setlist.songs[_currentIndex];
     final songProvider = Provider.of<SongProvider>(context, listen: false);
 
-    // Seleccionar el SetlistItem actual en SongProvider para que PresentationScreen lo use
     songProvider.setSelectedSetlistItem(currentItem, _currentIndex);
 
     return WillPopScope(
       onWillPop: () async {
-        // Limpiar la selección del setlist en SongProvider al salir
         songProvider.clearSetlistItem();
-        return true; // Permitir salir
+        return true;
       },
       child: Scaffold(
         body: SafeArea(
           child: Column(
             children: [
-              // Barra de estado del setlist
               Container(
                 padding: const EdgeInsets.all(8.0),
                 child: Row(
@@ -77,13 +88,7 @@ class _SetlistPresentationControllerState extends State<_SetlistPresentationCont
                   children: [
                     IconButton(
                       icon: const Icon(Icons.arrow_back),
-                      onPressed: () {
-                        if (_currentIndex > 0) {
-                          setState(() {
-                            _currentIndex--;
-                          });
-                        }
-                      },
+                      onPressed: _previousSong, // Usar la nueva función
                     ),
                     Text(
                       '${_currentIndex + 1} de ${widget.setlist.songs.length}',
@@ -91,22 +96,18 @@ class _SetlistPresentationControllerState extends State<_SetlistPresentationCont
                     ),
                     IconButton(
                       icon: const Icon(Icons.arrow_forward),
-                      onPressed: () {
-                        if (_currentIndex < widget.setlist.songs.length - 1) {
-                          setState(() {
-                            _currentIndex++;
-                          });
-                        }
-                      },
+                      onPressed: _nextSong, // Usar la nueva función
                     ),
                   ],
                 ),
               ),
-              // Separador
               const Divider(height: 1),
-              // Pantalla de presentación de la canción actual
               Expanded(
-                child: PresentationScreen(song: currentItem.song), // Pasa la canción del item
+                child: PresentationScreen(
+                  song: currentItem.song,
+                  onNextSong: _nextSong, // Pasar la función
+                  onPreviousSong: _previousSong, // Pasar la función
+                ),
               ),
             ],
           ),

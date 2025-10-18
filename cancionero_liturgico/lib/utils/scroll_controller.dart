@@ -117,6 +117,14 @@ class ScrollAutoController {
     }
   }
 
+  void increaseSpeed() {
+    adjustSpeedFactor(_userFactor + 0.1);
+  }
+
+  void decreaseSpeed() {
+    adjustSpeedFactor(_userFactor - 0.1);
+  }
+
   // Cambia la velocidad predeterminada (cuando no hay tempo)
   void setDefaultSpeed(double speed) {
     _defaultSpeed = speed;

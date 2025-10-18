@@ -13,8 +13,15 @@ import 'package:cancionero_liturgico/services/song_repository.dart';
 
 class PresentationScreen extends StatefulWidget {
   final Song song;
+  final VoidCallback? onNextSong;
+  final VoidCallback? onPreviousSong;
 
-  const PresentationScreen({super.key, required this.song});
+  const PresentationScreen({
+    super.key,
+    required this.song,
+    this.onNextSong,
+    this.onPreviousSong,
+  });
 
   @override
   State<PresentationScreen> createState() => _PresentationScreenState();
@@ -122,7 +129,13 @@ class _PresentationScreenState extends State<PresentationScreen> {
                       controller: _scrollController,
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
-                        onTap: _toggleAutoScroll,
+                        onTap: () {
+                          if (_showControls) {
+                            setState(() {
+                              _showControls = false;
+                            });
+                          }
+                        },
                         onScaleStart: (details) => _baseFontSize = _fontSize,
                         onScaleUpdate: (details) {
                           setState(() {
@@ -134,7 +147,6 @@ class _PresentationScreenState extends State<PresentationScreen> {
                         },
                         child: SingleChildScrollView(
                           controller: _scrollController,
-                          physics: const NeverScrollableScrollPhysics(),
                           child: ChordText(transposedContent, fontSize: _fontSize),
                         ),
                       ),
@@ -161,18 +173,16 @@ class _PresentationScreenState extends State<PresentationScreen> {
                   color: themeProvider.isDarkMode ? Colors.black.withOpacity(0.7) : Colors.white.withOpacity(0.7),
                   child: SafeArea(
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildControlGroup(
-                          'Tono',
-                          () => setState(() => _transpositionSemitones--),
-                          () => setState(() => _transpositionSemitones++),
-                        ),
+                        _buildToneControls(),
+                        const SizedBox(height: 20),
                         _buildControlGroup(
                           'Capo',
                           () => setState(() => _capoFret = (_capoFret - 1).clamp(0, 12)),
                           () => setState(() => _capoFret = (_capoFret + 1).clamp(0, 12)),
                         ),
+                        const SizedBox(height: 20),
                         _buildControlGroup(
                           'Fuente',
                           () => setState(() {
@@ -184,13 +194,22 @@ class _PresentationScreenState extends State<PresentationScreen> {
                             if (_dependenciesInitialized) _scrollAutoController.setFontSize(_fontSize);
                           }),
                         ),
+                        const SizedBox(height: 20),
+                        _buildControlGroup(
+                          'Velocidad',
+                          () {
+                            if (!_dependenciesInitialized) return;
+                            _scrollAutoController.decreaseSpeed();
+                          },
+                          () {
+                            if (!_dependenciesInitialized) return;
+                            _scrollAutoController.increaseSpeed();
+                          },
+                        ),
+                        const SizedBox(height: 20),
                         IconButton(
                           icon: Icon(themeProvider.isDarkMode ? Icons.wb_sunny : Icons.nights_stay, color: themeProvider.isDarkMode ? Colors.white : Colors.black),
                           onPressed: () => themeProvider.toggleTheme(),
-                        ),
-                        IconButton(
-                          icon: Icon(_isScrollingAutomatically ? Icons.pause : Icons.play_arrow, color: themeProvider.isDarkMode ? Colors.white : Colors.black),
-                          onPressed: _toggleAutoScroll,
                         ),
                       ],
                     ),
@@ -199,14 +218,58 @@ class _PresentationScreenState extends State<PresentationScreen> {
               ),
             ),
           ),
+
+          // Panel Toggle Button
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+            top: MediaQuery.of(context).size.height / 2 - 30,
+            right: _showControls ? 200 : 10,
+            child: FloatingActionButton(
+              mini: true,
+              backgroundColor: Colors.black.withOpacity(0.5),
+              onPressed: () => setState(() => _showControls = !_showControls),
+              child: Icon(_showControls ? Icons.arrow_forward_ios : Icons.arrow_back_ios, size: 18),
+            ),
+          ),
+
+          // Play/Pause Button
+          Positioned(
+            bottom: 30,
+            right: 16,
+            child: FloatingActionButton(
+              onPressed: _toggleAutoScroll,
+              child: Icon(_isScrollingAutomatically ? Icons.pause : Icons.play_arrow),
+            ),
+          ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.black.withOpacity(0.5),
-        onPressed: () => setState(() => _showControls = !_showControls),
-        child: Icon(_showControls ? Icons.arrow_forward_ios : Icons.arrow_back_ios),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerRight,
+    );
+  }
+
+  Widget _buildToneControls() {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    return Column(
+      children: [
+        Text('Tono', style: TextStyle(color: themeProvider.isDarkMode ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: () => setState(() => _transpositionSemitones--),
+              style: ElevatedButton.styleFrom(shape: const CircleBorder(), padding: const EdgeInsets.all(15)),
+              child: const Icon(Icons.remove),
+            ),
+            const SizedBox(width: 10),
+            ElevatedButton(
+              onPressed: () => setState(() => _transpositionSemitones++),
+              style: ElevatedButton.styleFrom(shape: const CircleBorder(), padding: const EdgeInsets.all(15)),
+              child: const Icon(Icons.add),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
