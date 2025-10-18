@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cancionero_liturgico/models/song.dart';
+import 'package:cancionero_liturgico/services/song_provider.dart';
 import 'package:cancionero_liturgico/services/song_repository.dart';
 import 'package:cancionero_liturgico/screens/song_detail_screen.dart';
 import 'package:cancionero_liturgico/screens/song_edit_screen.dart';
@@ -14,6 +15,7 @@ class SongListScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print("[SCREEN] Build: SongListScreen");
     final songRepository = Provider.of<SongRepository>(context, listen: false);
     final categoryRepository = Provider.of<CategoryRepository>(context, listen: false);
 
@@ -69,6 +71,9 @@ class SongListScreen extends StatelessWidget {
                       return SongItem(
                         song: song,
                         onTap: () {
+                          // **LA CORRECCIÓN: Establecer la canción seleccionada en el provider**
+                          Provider.of<SongProvider>(context, listen: false).setSelectedSong(song);
+
                           Navigator.push(
                             context,
                             MaterialPageRoute(

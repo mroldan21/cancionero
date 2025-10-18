@@ -28,6 +28,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
+    print("[SCREEN] Build: CategoriesScreen");
     return Scaffold(
       appBar: AppBar(
         title: const Text('Categorías'),
