@@ -20,21 +20,18 @@ class SongListScreen extends StatefulWidget {
 }
 
 class _SongListScreenState extends State<SongListScreen> {
-  late Future<List<Song>> _songsFuture;
+  // SOLUCIÓN: Usar una key para forzar la reconstrucción del FutureBuilder
+  int _futureBuilderKey = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadSongs();
   }
 
   void _loadSongs() {
-    final songRepository = Provider.of<SongRepository>(context, listen: false);
-    setState(() {
-      _songsFuture = widget.categoryId != null
-          ? songRepository.getSongsByCategory(widget.categoryId!)
-          : songRepository.getAllSongs();
-    });
+    // SOLUCIÓN: Simplemente incrementamos la key. Esto hará que el FutureBuilder
+    // se reconstruya y vuelva a llamar a su `future`.
+    setState(() => _futureBuilderKey++);
   }
 
   // MEJORA: Método para navegar y esperar resultado para refrescar la lista
@@ -98,7 +95,11 @@ class _SongListScreenState extends State<SongListScreen> {
         ],
       ),
       body: FutureBuilder<List<Song>>(
-              future: _songsFuture,
+              // SOLUCIÓN: Usar la key y definir el future directamente aquí.
+              key: ValueKey(_futureBuilderKey),
+              future: widget.categoryId != null
+                  ? songRepository.getSongsByCategory(widget.categoryId!)
+                  : songRepository.getAllSongs(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -119,8 +120,12 @@ class _SongListScreenState extends State<SongListScreen> {
                         title: Text(song.title),
                         subtitle: Text(song.author ?? 'Autor desconocido'),
                         onTap: () {
-                          Provider.of<SongProvider>(context, listen: false).setSelectedSong(song);
-                          _navigateAndRefreshSongs(SongDetailScreen(song: song));
+                          // SOLUCIÓN: Limpiamos el provider y luego establecemos la nueva canción.
+                          // Esto asegura que SongDetailScreen no use una versión "en caché" del provider.
+                          final songProvider = Provider.of<SongProvider>(context, listen: false);
+                          songProvider.setSelectedSong(song);
+                          // Y usamos el método que refresca la lista al volver.
+                          _navigateAndRefreshSongs(SongDetailScreen(song: song)); // CORRECCIÓN: Usar el método que refresca
                         },
                         onLongPress: () {
                           _navigateAndRefreshSongs(SongEditScreen(song: song));

@@ -70,6 +70,11 @@ class _PresentationScreenState extends State<PresentationScreen> {
     final songFromProvider = Provider.of<SongProvider>(context).currentSong;
     _currentSong = songFromProvider ?? widget.song;
 
+    // SOLUCIÓN: Actualizar el tamaño de la fuente aquí, después de obtener la canción correcta.
+    print("[DEBUG] PresentationScreen didChangeDependencies: Cargando canción '${_currentSong.title}' con preferredFontSize: ${_currentSong.preferredFontSize}");
+    _fontSize = _currentSong.preferredFontSize ?? 24.0;
+    print("[DEBUG] PresentationScreen didChangeDependencies: _fontSize actualizado a: $_fontSize");
+
     super.didChangeDependencies();
     if (!_dependenciesInitialized) {
       _dependenciesInitialized = true;
@@ -77,7 +82,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
         scrollController: _scrollController,
         screenHeight: MediaQuery.of(context).size.height,
         songTempoBpm: _currentSong.tempoBpm,
-        totalLines: widget.song.content.split('\n').length,
+        totalLines: _currentSong.content.split('\n').length, // Usar la canción actual
         fontSize: _fontSize,
       );
       final songRepository = Provider.of<SongRepository>(context, listen: false);
@@ -126,8 +131,12 @@ class _PresentationScreenState extends State<PresentationScreen> {
       content: finalContent,
       originalKey: finalKey,
       capoPosition: _capoFret,
+      preferredFontSize: _fontSize, // Guardar el tamaño de fuente actual
       modificationDate: DateTime.now(),
     );
+
+    // VERIFICACIÓN: Imprimir el valor que se va a guardar en la BD.
+    print("[DEBUG] _saveChanges: Intentando guardar en BD. Song ID: ${updatedSong.id}, preferredFontSize: ${updatedSong.preferredFontSize}");
 
     // 3. Guardar la canción actualizada en la base de datos.
     await songRepository.updateSong(updatedSong);
@@ -137,6 +146,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
 
     // 5. Mostrar confirmación y actualizar el estado local.
     if (mounted) {
+      print("[DEBUG] _saveChanges: Cambios guardados. Actualizando estado local. Nuevo FontSize: ${_fontSize}");
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Cambios guardados en la canción.'), backgroundColor: Colors.green),
       );

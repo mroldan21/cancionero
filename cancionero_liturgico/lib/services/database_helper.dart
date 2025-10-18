@@ -19,7 +19,7 @@ class DatabaseHelper {
     String path = join(await getDatabasesPath(), 'cancionero.db');
     return await openDatabase(
       path,
-      version: 3, // Incrementar versión para forzar la recreación
+      version: 4, // Incrementar versión para añadir preferred_font_size
       onCreate: _onCreate,
       onUpgrade: _onUpgrade, // Añadir callback de actualización
     );
@@ -86,6 +86,7 @@ class DatabaseHelper {
         tempo_bpm INTEGER, -- Puede ser nulo
         posicion_capo INTEGER DEFAULT 0,
         es_favorita INTEGER DEFAULT 0, -- BOOLEANO
+        preferred_font_size REAL, -- Nuevo campo para el tamaño de fuente
         contador_reproducciones INTEGER DEFAULT 0,
         fecha_creacion TEXT NOT NULL, -- Almacenar como TEXT en formato ISO
         fecha_modificacion TEXT NOT NULL, -- Almacenar como TEXT en formato ISO
@@ -291,6 +292,7 @@ class DatabaseHelper {
         'tempo_bpm': (songData['tempo_bpm'] as num?)?.toInt(), // Cast y conversión
         'posicion_capo': (songData['posicion_capo'] as num?)?.toInt() ?? 0, // Cast, conversión y valor por defecto
         'es_favorita': 0, // Por defecto no favorita
+        'preferred_font_size': null, // Por defecto nulo
         'contador_reproducciones': 0, // Por defecto 0
         'fecha_creacion': DateTime.now().toIso8601String(), // Fecha actual
         'fecha_modificacion': DateTime.now().toIso8601String(), // Fecha actual

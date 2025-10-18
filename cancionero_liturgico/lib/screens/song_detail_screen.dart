@@ -34,6 +34,18 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
     // Si estamos en modo setlist, nos aseguramos que el provider esté sincronizado.
   }
 
+  // SOLUCIÓN: Usar didUpdateWidget para mantener el estado sincronizado.
+  // Este método se llama cuando el widget es reconstruido con nuevos parámetros,
+  // como cuando se navega entre canciones de un setlist o se vuelve a la pantalla
+  // con una versión actualizada de la canción desde SongListScreen.
+  @override
+  void didUpdateWidget(covariant SongDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.song != oldWidget.song) {
+      _currentSong = widget.song;
+    }
+  }
+
   void _goToNextSong() {
     if (widget.setlistItems == null) return;
 
@@ -64,9 +76,8 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
     final songRepository = Provider.of<SongRepository>(context, listen: false);
     songRepository.toggleFavorite(_currentSong.id!);
     setState(() {
-      _currentSong = Song(
-        id: _currentSong.id, title: _currentSong.title, author: _currentSong.author, content: _currentSong.content, originalKey: _currentSong.originalKey, tempoBpm: _currentSong.tempoBpm, capoPosition: _currentSong.capoPosition, isFavorite: !_currentSong.isFavorite, playCount: _currentSong.playCount, creationDate: _currentSong.creationDate, modificationDate: _currentSong.modificationDate, notes: _currentSong.notes, videoLinks: _currentSong.videoLinks
-      );
+      // Usar copyWith es más seguro y limpio
+      _currentSong = _currentSong.copyWith(isFavorite: !_currentSong.isFavorite);
     });
   }
 
@@ -79,11 +90,22 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
     // Escuchamos siempre al provider para reaccionar a cambios (next/previous y guardado).
     final songProvider = Provider.of<SongProvider>(context);
     final songRepository = Provider.of<SongRepository>(context, listen: false); // No necesita escuchar
-    
-    // La fuente de verdad es la canción del provider si existe, si no, la del widget.
-    final currentSong = songProvider.currentSong ?? _currentSong;
+
+    // Esta lógica se mantiene y es correcta para reaccionar a los cambios
+    // INMEDIATOS después de guardar en PresentationScreen, ya que el provider
+    // se actualiza y notifica a esta pantalla.
+    if (songProvider.currentSong != null &&
+        songProvider.currentSong!.id == _currentSong.id &&
+        songProvider.currentSong!.modificationDate.isAfter(_currentSong.modificationDate)) {
+      // Usamos un post-frame callback para actualizar el estado de forma segura
+      // después de que el frame actual se haya construido.
+      WidgetsBinding.instance.addPostFrameCallback((_) => setState(() => _currentSong = songProvider.currentSong!));
+    }
+
+    final currentSong = _currentSong; // Usar siempre el estado local actualizado.
 
     // Usamos PopScope para interceptar la navegación hacia atrás y limpiar el estado.
+    print("[DEBUG] SongDetailScreen build: Mostrando canción '${currentSong.title}' con preferredFontSize: ${currentSong.preferredFontSize}");
     return PopScope(
       canPop: true, // Permitir siempre la navegación hacia atrás.
       onPopInvoked: (didPop) {

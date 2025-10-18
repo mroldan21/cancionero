@@ -97,7 +97,11 @@ class ScrollAutoController {
   // Detiene el scroll y vuelve al inicio
   void stop() {
     pause();
-    _scrollController.jumpTo(0.0);
+    // SOLUCIÓN: Solo intentar saltar al inicio si el controlador todavía está adjunto a una vista.
+    // Esto evita el error "ScrollController not attached" cuando se llama desde dispose().
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(0.0);
+    }
   }
 
   // Verifica si está actualmente en scroll automático
