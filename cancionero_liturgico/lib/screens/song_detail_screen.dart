@@ -74,21 +74,14 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
   Widget build(BuildContext context) {
     print("[SCREEN] Build: SongDetailScreen");
     
-    final isSetlistMode = widget.setlistItems != null && widget.setlistItems!.isNotEmpty;
-    
-    // Escuchamos al provider solo en modo setlist para reaccionar a next/previous.
-    final songProvider = Provider.of<SongProvider>(context, listen: isSetlistMode);
-    final songRepository = Provider.of<SongRepository>(context, listen: false); // No necesita escuchar
+    final isSetlistMode = widget.setlistItems?.isNotEmpty ?? false;
 
-    // La fuente de verdad es el estado local `_currentSong`.
-    // En modo setlist, si el provider tiene una canción, la usamos para actualizar el estado local.
-    final Song currentSong;
-    if (isSetlistMode && songProvider.currentSong != null) {
-      // Sincronizamos el estado local con el del provider
-      _currentSong = songProvider.currentSong!;
-    }
-    // Usamos siempre el estado local para renderizar.
-    currentSong = _currentSong;
+    // Escuchamos siempre al provider para reaccionar a cambios (next/previous y guardado).
+    final songProvider = Provider.of<SongProvider>(context);
+    final songRepository = Provider.of<SongRepository>(context, listen: false); // No necesita escuchar
+    
+    // La fuente de verdad es la canción del provider si existe, si no, la del widget.
+    final currentSong = songProvider.currentSong ?? _currentSong;
 
     // Usamos PopScope para interceptar la navegación hacia atrás y limpiar el estado.
     return PopScope(

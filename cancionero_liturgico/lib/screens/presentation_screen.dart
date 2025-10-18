@@ -41,16 +41,21 @@ class _PresentationScreenState extends State<PresentationScreen> {
   bool _showControls = false;
 
   int _transpositionSemitones = 0;
+  late Song _currentSong; // Estado local para la canción
   int _capoFret = 0;
 
   @override
   void initState() {
     super.initState();
+    // SOLUCIÓN: Inicializar _currentSong aquí para evitar el LateInitializationError.
+    _currentSong = widget.song;
+
     // Si se proporciona un setlistItem, usar sus valores. Si no, cargar los guardados.
     if (widget.setlistItem != null) {
       _transpositionSemitones = widget.setlistItem!.transposition;
       _capoFret = widget.setlistItem!.capo ?? 0;
     } else {
+      // Carga los ajustes iniciales, pero no los vuelve a cargar en didChangeDependencies
       final settings = Provider.of<PresentationStateService>(context, listen: false).getSettingsForSong(widget.song);
       _transpositionSemitones = settings.transposition;
       _capoFret = settings.capo;
@@ -61,14 +66,9 @@ class _PresentationScreenState extends State<PresentationScreen> {
   @override
   void didChangeDependencies() {
     // Esta lógica se mantiene para cuando se navega entre canciones de un setlist
-    // Esto se llama si el widget.song cambia (ej. en un setlist)
-    // CORRECCIÓN: Solo cargar desde el servicio si NO estamos en modo setlist.
-    if (widget.setlistItem == null) {
-      final settings = Provider.of<PresentationStateService>(context, listen: false).getSettingsForSong(widget.song);
-      _transpositionSemitones = settings.transposition;
-      _capoFret = settings.capo;
-    }
-    // Si estamos en modo setlist, los valores ya se establecieron en initState y no deben sobreescribirse.
+    // SOLUCIÓN: Sincronizar _currentSong con el provider.
+    final songFromProvider = Provider.of<SongProvider>(context).currentSong;
+    _currentSong = songFromProvider ?? widget.song;
 
     super.didChangeDependencies();
     if (!_dependenciesInitialized) {
@@ -76,7 +76,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
       _scrollAutoController = ScrollAutoController(
         scrollController: _scrollController,
         screenHeight: MediaQuery.of(context).size.height,
-        songTempoBpm: widget.song.tempoBpm,
+        songTempoBpm: _currentSong.tempoBpm,
         totalLines: widget.song.content.split('\n').length,
         fontSize: _fontSize,
       );
@@ -110,19 +110,41 @@ class _PresentationScreenState extends State<PresentationScreen> {
     }
   }
 
-  Future<void> _updatePresentationSettings() async {
-    if (widget.song.id == null) return;
+  // Lógica para guardar los cambios permanentemente
+  Future<void> _saveChanges() async {
+    if (_currentSong.id == null) return;
 
+    final songProvider = Provider.of<SongProvider>(context, listen: false);
     final songRepository = Provider.of<SongRepository>(context, listen: false);
 
-    // La transposición es siempre temporal, pero el capo se guarda como el nuevo valor por defecto de la canción.
-    // La nueva lógica es que los cambios siempre afectan a la canción, no al setlist item.
-    final updatedSong = widget.song.copyWith(
+    // 1. Aplicar la transposición actual al contenido y a la tonalidad original.
+    final finalContent = TranspositionService.transposeContent(_currentSong.content, _transpositionSemitones);
+    final finalKey = TranspositionService.getTransposedOriginalKey(_currentSong.originalKey, _transpositionSemitones);
+
+    // 2. Crear una nueva instancia de la canción con los cambios aplicados.
+    final updatedSong = _currentSong.copyWith(
+      content: finalContent,
+      originalKey: finalKey,
       capoPosition: _capoFret,
-      // La transposición no se guarda, es un ajuste de visualización.
-      // Si se quisiera guardar, se necesitaría un campo en la BD para la canción.
+      modificationDate: DateTime.now(),
     );
+
+    // 3. Guardar la canción actualizada en la base de datos.
     await songRepository.updateSong(updatedSong);
+
+    // 4. Actualizar el provider para que toda la app se entere del cambio.
+    songProvider.setSelectedSong(updatedSong);
+
+    // 5. Mostrar confirmación y actualizar el estado local.
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cambios guardados en la canción.'), backgroundColor: Colors.green),
+      );
+      setState(() {
+        _currentSong = updatedSong; // La canción base ahora es la actualizada.
+        _transpositionSemitones = 0; // La transposición se resetea a 0.
+      });
+    }
   }
 
 
@@ -130,8 +152,8 @@ class _PresentationScreenState extends State<PresentationScreen> {
   Widget build(BuildContext context) {
     print("[SCREEN] Build: PresentationScreen");
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final displayedKey = TranspositionService.getTransposedOriginalKey(widget.song.originalKey, _transpositionSemitones);
-    final transposedContent = TranspositionService.transposeContent(widget.song.content, _transpositionSemitones);
+    final displayedKey = TranspositionService.getTransposedOriginalKey(_currentSong.originalKey, _transpositionSemitones);
+    final transposedContent = TranspositionService.transposeContent(_currentSong.content, _transpositionSemitones);
 
     return Scaffold(
       backgroundColor: themeProvider.isDarkMode ? Colors.black : Colors.white,
@@ -160,9 +182,14 @@ class _PresentationScreenState extends State<PresentationScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            widget.song.title,
+                            _currentSong.title,
                             style: TextStyle(fontSize: _fontSize * 0.8, fontWeight: FontWeight.bold, color: themeProvider.isDarkMode ? Colors.white : Colors.black),
                           ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.save, color: Colors.blue),
+                          tooltip: 'Guardar cambios permanentemente',
+                          onPressed: _saveChanges,
                         ),
                         IconButton(
                           icon: const Icon(Icons.close, color: Colors.red),
@@ -231,10 +258,10 @@ class _PresentationScreenState extends State<PresentationScreen> {
                           'Capo',
                           Icons.straighten,
                           () => setState(() {
-                            _capoFret = (_capoFret - 1).clamp(0, 12); _updatePresentationSettings();
+                            _capoFret = (_capoFret - 1).clamp(0, 12);
                           }),
                           () => setState(() {
-                            _capoFret = (_capoFret + 1).clamp(0, 12); _updatePresentationSettings();
+                            _capoFret = (_capoFret + 1).clamp(0, 12);
                           }),
                         ),
                         const SizedBox(height: 20),
@@ -316,14 +343,14 @@ class _PresentationScreenState extends State<PresentationScreen> {
           children: [
             ElevatedButton(
               onPressed: () => setState(() {
-                _transpositionSemitones--; _updatePresentationSettings();
+                _transpositionSemitones--;
               }),
               style: ElevatedButton.styleFrom(shape: const CircleBorder(), padding: const EdgeInsets.all(15)),
               child: const Icon(Icons.remove),
             ),
             const SizedBox(width: 10),
-            ElevatedButton(
-              onPressed: () => setState(() { _transpositionSemitones++; _updatePresentationSettings();
+            ElevatedButton(onPressed: () => setState(() {
+                _transpositionSemitones++;
               }),
               style: ElevatedButton.styleFrom(shape: const CircleBorder(), padding: const EdgeInsets.all(15)),
               child: const Icon(Icons.add),
