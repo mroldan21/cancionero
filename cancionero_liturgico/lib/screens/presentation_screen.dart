@@ -62,9 +62,14 @@ class _PresentationScreenState extends State<PresentationScreen> {
   void didChangeDependencies() {
     // Esta lógica se mantiene para cuando se navega entre canciones de un setlist
     // Esto se llama si el widget.song cambia (ej. en un setlist)
-    final settings = Provider.of<PresentationStateService>(context, listen: false).getSettingsForSong(widget.song);
-    _transpositionSemitones = settings.transposition;
-    _capoFret = settings.capo;
+    // CORRECCIÓN: Solo cargar desde el servicio si NO estamos en modo setlist.
+    if (widget.setlistItem == null) {
+      final settings = Provider.of<PresentationStateService>(context, listen: false).getSettingsForSong(widget.song);
+      _transpositionSemitones = settings.transposition;
+      _capoFret = settings.capo;
+    }
+    // Si estamos en modo setlist, los valores ya se establecieron en initState y no deben sobreescribirse.
+
     super.didChangeDependencies();
     if (!_dependenciesInitialized) {
       _dependenciesInitialized = true;
@@ -84,10 +89,12 @@ class _PresentationScreenState extends State<PresentationScreen> {
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    // Primero, detenemos el auto-scroll que usa el controller.
     if (_dependenciesInitialized) {
       _scrollAutoController.stop();
     }
+    // Luego, liberamos el controller.
+    _scrollController.dispose();
     WakelockPlus.disable();
     super.dispose();
   }
@@ -103,14 +110,19 @@ class _PresentationScreenState extends State<PresentationScreen> {
     }
   }
 
-  void _updatePresentationSettings() {
+  Future<void> _updatePresentationSettings() async {
     if (widget.song.id == null) return;
-    final provider = Provider.of<PresentationStateService>(context, listen: false);
-    final newSettings = PresentationSettings(
-      transposition: _transpositionSemitones,
-      capo: _capoFret,
+
+    final songRepository = Provider.of<SongRepository>(context, listen: false);
+
+    // La transposición es siempre temporal, pero el capo se guarda como el nuevo valor por defecto de la canción.
+    // La nueva lógica es que los cambios siempre afectan a la canción, no al setlist item.
+    final updatedSong = widget.song.copyWith(
+      capoPosition: _capoFret,
+      // La transposición no se guarda, es un ajuste de visualización.
+      // Si se quisiera guardar, se necesitaría un campo en la BD para la canción.
     );
-    provider.updateSettings(widget.song, newSettings);
+    await songRepository.updateSong(updatedSong);
   }
 
 
@@ -219,12 +231,10 @@ class _PresentationScreenState extends State<PresentationScreen> {
                           'Capo',
                           Icons.straighten,
                           () => setState(() {
-                            _capoFret = (_capoFret - 1).clamp(0, 12);
-                            _updatePresentationSettings();
+                            _capoFret = (_capoFret - 1).clamp(0, 12); _updatePresentationSettings();
                           }),
                           () => setState(() {
-                            _capoFret = (_capoFret + 1).clamp(0, 12);
-                            _updatePresentationSettings();
+                            _capoFret = (_capoFret + 1).clamp(0, 12); _updatePresentationSettings();
                           }),
                         ),
                         const SizedBox(height: 20),
@@ -306,17 +316,14 @@ class _PresentationScreenState extends State<PresentationScreen> {
           children: [
             ElevatedButton(
               onPressed: () => setState(() {
-                _transpositionSemitones--;
-                _updatePresentationSettings();
+                _transpositionSemitones--; _updatePresentationSettings();
               }),
               style: ElevatedButton.styleFrom(shape: const CircleBorder(), padding: const EdgeInsets.all(15)),
               child: const Icon(Icons.remove),
             ),
             const SizedBox(width: 10),
             ElevatedButton(
-              onPressed: () => setState(() {
-                _transpositionSemitones++;
-                _updatePresentationSettings();
+              onPressed: () => setState(() { _transpositionSemitones++; _updatePresentationSettings();
               }),
               style: ElevatedButton.styleFrom(shape: const CircleBorder(), padding: const EdgeInsets.all(15)),
               child: const Icon(Icons.add),

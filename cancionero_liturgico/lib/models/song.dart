@@ -29,6 +29,39 @@ class Song {
     this.videoLinks, // Puede ser nulo
   });
 
+  // Método copyWith para crear una copia con valores actualizados
+  Song copyWith({
+    int? id,
+    String? title,
+    String? author,
+    String? content,
+    String? originalKey,
+    int? tempoBpm,
+    int? capoPosition,
+    bool? isFavorite,
+    int? playCount,
+    DateTime? creationDate,
+    DateTime? modificationDate,
+    String? notes,
+    List<String>? videoLinks,
+  }) {
+    return Song(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      author: author ?? this.author,
+      content: content ?? this.content,
+      originalKey: originalKey ?? this.originalKey,
+      tempoBpm: tempoBpm ?? this.tempoBpm,
+      capoPosition: capoPosition ?? this.capoPosition,
+      isFavorite: isFavorite ?? this.isFavorite,
+      playCount: playCount ?? this.playCount,
+      creationDate: creationDate ?? this.creationDate,
+      modificationDate: modificationDate ?? this.modificationDate,
+      notes: notes ?? this.notes,
+      videoLinks: videoLinks ?? this.videoLinks,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,

@@ -211,8 +211,6 @@ class SongRepository {
       for (var songMap in songMaps) {
         final songId = songMap['cancion_id'] as int;
         final order = songMap['orden'] as int;
-        final transposition = songMap['transposicion_semitonos'] as int? ?? 0;
-        final capo = songMap['capo_personalizado'] as int?;
         print("[DEBUG] getAllSetlists:   - Buscando canción con ID: $songId.");
 
         // CORRECCIÓN: Usar una consulta que incluya los IDs de las categorías,
@@ -232,8 +230,6 @@ class SongRepository {
           setlistItems.add(SetlistItem(
             song: song,
             order: order,
-            transposition: transposition,
-            capo: capo,
           ));
         } else {
           print("[DEBUG] getAllSetlists:   - ¡ERROR! No se encontró la canción con ID: $songId en la tabla 'songs'. Este setlist podría estar incompleto.");
@@ -264,8 +260,6 @@ class SongRepository {
           'setlist_id': setlistId,
           'cancion_id': setlistItem.song.id!,
           'orden': i + 1,
-          'transposicion_semitonos': setlistItem.transposition,
-          'capo_personalizado': setlistItem.capo,
         });
       }
     });
@@ -286,8 +280,6 @@ class SongRepository {
           'setlist_id': setlist.id,
           'cancion_id': setlistItem.song.id!,
           'orden': i + 1,
-          'transposicion_semitonos': setlistItem.transposition,
-          'capo_personalizado': setlistItem.capo,
         });
       }
     });

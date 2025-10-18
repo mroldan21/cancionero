@@ -295,7 +295,7 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
                         song: song,
                         order: _selectedItems.length + 1, // El orden se recalculará al guardar
                         transposition: 0, // Valor por defecto
-                        capo: null, // Valor por defecto
+                        capo: song.capoPosition, // CORRECCIÓN: Tomar el capo por defecto de la canción
                       ));
                     });
                   },
