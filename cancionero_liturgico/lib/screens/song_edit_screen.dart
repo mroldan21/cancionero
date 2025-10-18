@@ -101,7 +101,8 @@ class _SongEditScreenState extends State<SongEditScreen> {
         // Por ahora, se asume que setCategoriasForSong maneja la inserción y obtención del ID internomente
         // await songRepository.setCategoriasForSong(insertedId, _selectedCategoryIds);
       }
-      Navigator.pop(context); // Volver a la pantalla anterior
+      // MEJORA: Volver a la pantalla anterior con un resultado exitoso
+      Navigator.pop(context, true);
     }
   }
 

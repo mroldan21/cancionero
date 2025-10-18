@@ -5,6 +5,7 @@ import 'package:cancionero_liturgico/services/song_provider.dart';
 import 'package:cancionero_liturgico/services/theme_provider.dart';
 import 'package:cancionero_liturgico/services/category_repository.dart';
 import 'package:cancionero_liturgico/services/song_repository.dart';
+import 'package:cancionero_liturgico/services/presentation_state_service.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -17,18 +18,24 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         Provider(create: (_) => CategoryRepository()),
         Provider(create: (_) => SongRepository()),
-        // Añadir aquí otros providers si se crean (ej: SyncService, ConfigService)
+        // MEJORA: Registrar el nuevo servicio para que esté disponible en la app.
+        ChangeNotifierProvider(
+          create: (context) => PresentationStateService(
+            Provider.of<SongRepository>(context, listen: false),
+          ),
+        ),
       ],
-      child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, child) {
-          return MaterialApp(
-            title: 'Cancionero Litúrgico',
-            theme: themeProvider.currentTheme,
-            home: const MainNavigationScreen(),
-            debugShowCheckedModeBanner: false,
-          );
-        },
-      ),
+      // MEJORA: Simplificar la estructura para asegurar que el contexto del Provider
+      // esté siempre por encima de MaterialApp.
+      child: Builder(builder: (context) {
+        final themeProvider = Provider.of<ThemeProvider>(context);
+        return MaterialApp(
+          title: 'Cancionero Litúrgico',
+          theme: themeProvider.currentTheme,
+          home: const MainNavigationScreen(),
+          debugShowCheckedModeBanner: false,
+        );
+      }),
     );
   }
 }

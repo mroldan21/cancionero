@@ -70,8 +70,6 @@ class SongSearchDelegate extends SearchDelegate<Song?> {
             // Cerrar la búsqueda y navegar al detalle
             close(context, song);
           },
-          // Opcional: Resaltar el texto de la búsqueda
-          query: query,
         );
       },
     );

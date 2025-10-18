@@ -92,7 +92,7 @@ class _CategoryListView extends StatelessWidget {
                 subtitle: category.isPredefined ? const Text('Categoría predefinida', style: TextStyle(fontSize: 12)) : null,
                 trailing: FutureBuilder<int>(
                   // MEJORA: Obtener y mostrar la cantidad de canciones por categoría
-                  future: Provider.of<SongRepository>(context, listen: false).getSongCountForCategory(category.id!),
+                  future: Provider.of<CategoryRepository>(context, listen: false).getSongCountForCategory(category.id!),
                   builder: (context, countSnapshot) {
                     if (countSnapshot.connectionState == ConnectionState.waiting) {
                       return const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2));

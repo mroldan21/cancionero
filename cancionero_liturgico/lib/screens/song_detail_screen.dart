@@ -7,26 +7,37 @@ import 'package:cancionero_liturgico/widgets/chord_text.dart';
 import 'package:cancionero_liturgico/services/song_repository.dart';
 import 'package:cancionero_liturgico/screens/song_edit_screen.dart';
 
-class SongDetailScreen extends StatelessWidget {
+class SongDetailScreen extends StatefulWidget {
   final Song song;
 
   const SongDetailScreen({super.key, required this.song});
 
   @override
+  State<SongDetailScreen> createState() => _SongDetailScreenState();
+}
+
+class _SongDetailScreenState extends State<SongDetailScreen> {
+  late Song _currentSong;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentSong = widget.song;
+  }
+
+  @override
   Widget build(BuildContext context) {
     print("[SCREEN] Build: SongDetailScreen");
     final songRepository = Provider.of<SongRepository>(context, listen: false);
-    final currentSong = song;
-    String displayedKey = currentSong.originalKey;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(currentSong.title),
+        title: Text(_currentSong.title),
         actions: [
           IconButton(
-            icon: Icon(currentSong.isFavorite ? Icons.star : Icons.star_border),
+            icon: Icon(_currentSong.isFavorite ? Icons.star : Icons.star_border),
             onPressed: () {
-              songRepository.toggleFavorite(currentSong.id!);
+              songRepository.toggleFavorite(_currentSong.id!);
             },
           ),
           IconButton(
@@ -35,7 +46,7 @@ class SongDetailScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => PresentationScreen(song: currentSong),
+                  builder: (context) => PresentationScreen(song: _currentSong),
                 ),
               );
             },
@@ -43,10 +54,21 @@ class SongDetailScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.edit),
             onPressed: () {
-              Navigator.push(
+              // MEJORA: Navegar y esperar un resultado para actualizar la UI
+              Navigator.push<bool>(
                 context,
-                MaterialPageRoute(builder: (context) => const SongEditScreen(song: null)),
-              );
+                MaterialPageRoute(builder: (context) => SongEditScreen(song: _currentSong)),
+              ).then((result) async {
+                // Si la edición fue exitosa (result == true)
+                if (result == true && _currentSong.id != null) {
+                  // Recargar la canción desde la base de datos
+                  final updatedSong = await songRepository.getSongById(_currentSong.id!);
+                  if (updatedSong != null) {
+                    // Actualizar el estado para refrescar la pantalla
+                    setState(() => _currentSong = updatedSong);
+                  }
+                }
+              });
             },
           ),
         ],
@@ -57,50 +79,50 @@ class SongDetailScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Autor: ${currentSong.author ?? "Desconocido"}',
+              'Autor: ${_currentSong.author ?? "Desconocido"}',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             Text(
-              'Tono Original (Transpuesto): $displayedKey',
+              'Tono Original: ${_currentSong.originalKey}',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             Text(
-              'Tempo: ${currentSong.tempoBpm ?? "N/A"} BPM',
+              'Tempo: ${_currentSong.tempoBpm ?? "N/A"} BPM',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             Text(
-              'Capo: ${currentSong.capoPosition != 0 ? "Traste ${currentSong.capoPosition}" : "No"}',
+              'Capo: ${_currentSong.capoPosition != 0 ? "Traste ${_currentSong.capoPosition}" : "No"}',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             Text(
-              'Reproducciones: ${currentSong.playCount}',
+              'Reproducciones: ${_currentSong.playCount}',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
             Expanded(
               child: ChordText(
-                currentSong.content,
+                _currentSong.content,
                 fontSize: 16.0,
               ),
             ),
-            if (currentSong.notes != null && currentSong.notes!.isNotEmpty) ...[
+            if (_currentSong.notes != null && _currentSong.notes!.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
                 'Notas:',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               Text(
-                currentSong.notes!,
+                _currentSong.notes!,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ],
-            if (currentSong.videoLinks != null && currentSong.videoLinks!.isNotEmpty) ...[
+            if (_currentSong.videoLinks != null && _currentSong.videoLinks!.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
                 'Videos:',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
-              ...currentSong.videoLinks!.map(
+              ..._currentSong.videoLinks!.map(
                 (link) => ListTile(
                   title: Text(link),
                   onTap: () {
@@ -153,22 +175,22 @@ class SongDetailScreen extends StatelessWidget {
                       ),
                       TextButton(
                         onPressed: () {
-                          String newContent = TranspositionService.transposeContent(currentSong.content, transposition);
-                          String newOriginalKey = TranspositionService.getTransposedOriginalKey(currentSong.originalKey, transposition);
+                          String newContent = TranspositionService.transposeContent(_currentSong.content, transposition);
+                          String newOriginalKey = TranspositionService.getTransposedOriginalKey(_currentSong.originalKey, transposition);
                           Song updatedSong = Song(
-                            id: currentSong.id,
-                            title: currentSong.title,
-                            author: currentSong.author,
+                            id: _currentSong.id,
+                            title: _currentSong.title,
+                            author: _currentSong.author,
                             content: newContent,
                             originalKey: newOriginalKey,
-                            tempoBpm: currentSong.tempoBpm,
-                            capoPosition: currentSong.capoPosition,
-                            isFavorite: currentSong.isFavorite,
-                            playCount: currentSong.playCount,
-                            creationDate: currentSong.creationDate,
+                            tempoBpm: _currentSong.tempoBpm,
+                            capoPosition: _currentSong.capoPosition,
+                            isFavorite: _currentSong.isFavorite,
+                            playCount: _currentSong.playCount,
+                            creationDate: _currentSong.creationDate,
                             modificationDate: DateTime.now(),
-                            notes: currentSong.notes,
-                            videoLinks: currentSong.videoLinks,
+                            notes: _currentSong.notes,
+                            videoLinks: _currentSong.videoLinks,
                           );
                           songRepository.updateSong(updatedSong);
                           Navigator.pop(context, transposition);

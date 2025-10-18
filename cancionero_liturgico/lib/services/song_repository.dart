@@ -121,6 +121,26 @@ class SongRepository {
     return songs;
   }
 
+  Future<Song?> getSongById(int songId) async {
+    final db = await _databaseHelper.database;
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT 
+        $_songColumns,
+        GROUP_CONCAT(cc.categoria_id) as categoria_ids
+      FROM songs s
+      LEFT JOIN cancion_categoria cc ON s.id = cc.cancion_id
+      WHERE s.id = ?
+      GROUP BY s.id
+    ''', [songId]);
+
+    if (maps.isNotEmpty) {
+      final song = Song.fromMap(maps.first);
+      return song;
+    }
+
+    return null;
+  }
+
   Future<void> insertSong(Song song) async {
     final db = await _databaseHelper.database;
     await db.transaction((txn) async {
@@ -168,12 +188,15 @@ class SongRepository {
   }
 
   Future<List<Setlist>> getAllSetlists() async {
+    print("[DEBUG] getAllSetlists: Iniciando obtención de setlists.");
     final db = await _databaseHelper.database;
     final List<Map<String, dynamic>> setlistMaps = await db.query('setlists', orderBy: 'nombre');
+    print("[DEBUG] getAllSetlists: Encontrados ${setlistMaps.length} setlists en la tabla 'setlists'.");
 
     List<Setlist> setlists = [];
     for (var setlistMap in setlistMaps) {
       final setlist = Setlist.fromMap(setlistMap);
+      print("[DEBUG] getAllSetlists: Procesando setlist '${setlist.name}' (ID: ${setlist.id}).");
 
       final songMaps = await db.query(
         'setlist_cancion',
@@ -181,6 +204,7 @@ class SongRepository {
         whereArgs: [setlist.id],
         orderBy: 'orden ASC',
       );
+      print("[DEBUG] getAllSetlists: Setlist '${setlist.name}' tiene ${songMaps.length} canciones asociadas.");
 
       List<SetlistItem> setlistItems = [];
       for (var songMap in songMaps) {
@@ -188,16 +212,30 @@ class SongRepository {
         final order = songMap['orden'] as int;
         final transposition = songMap['transposicion_semitonos'] as int? ?? 0;
         final capo = songMap['capo_personalizado'] as int?;
+        print("[DEBUG] getAllSetlists:   - Buscando canción con ID: $songId.");
 
-        final songResult = await db.query('songs', where: 'id = ?', whereArgs: [songId]);
+        // CORRECCIÓN: Usar una consulta que incluya los IDs de las categorías,
+        // igual que en getSongById, para que Song.fromMap funcione correctamente.
+        final songResult = await db.rawQuery('''
+          SELECT $_songColumns, GROUP_CONCAT(cc.categoria_id) as categoria_ids
+          FROM songs s
+          LEFT JOIN cancion_categoria cc ON s.id = cc.cancion_id
+          WHERE s.id = ?
+          GROUP BY s.id
+        ''', [songId]);
+        print("[DEBUG] getAllSetlists:   - Resultado de la consulta para la canción ID $songId: ${songResult.isNotEmpty ? 'Encontrada' : 'NO Encontrada'}.");
+
         if (songResult.isNotEmpty) {
           final song = Song.fromMap(songResult.first);
+          print("[DEBUG] getAllSetlists:   - SetlistItem para la canción '${song.title}' añadido correctamente.");
           setlistItems.add(SetlistItem(
             song: song,
             order: order,
             transposition: transposition,
             capo: capo,
           ));
+        } else {
+          print("[DEBUG] getAllSetlists:   - ¡ERROR! No se encontró la canción con ID: $songId en la tabla 'songs'. Este setlist podría estar incompleto.");
         }
       }
       setlists.add(Setlist(
@@ -210,6 +248,7 @@ class SongRepository {
         songs: setlistItems,
       ));
     }
+    print("[DEBUG] getAllSetlists: Finalizado. Devolviendo ${setlists.length} setlists completos.");
     return setlists;
   }
 

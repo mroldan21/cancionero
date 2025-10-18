@@ -6,6 +6,7 @@ import 'package:cancionero_liturgico/models/song.dart';
 import 'package:cancionero_liturgico/services/song_provider.dart';
 import 'package:cancionero_liturgico/services/theme_provider.dart';
 import 'package:cancionero_liturgico/services/transposition_service.dart';
+import 'package:cancionero_liturgico/services/presentation_state_service.dart';
 import 'package:cancionero_liturgico/widgets/song_content_view.dart'; // MEJORA: Usar el nuevo widget optimizado
 import 'package:cancionero_liturgico/utils/scroll_controller.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -42,12 +43,19 @@ class _PresentationScreenState extends State<PresentationScreen> {
   @override
   void initState() {
     super.initState();
-    _capoFret = widget.song.capoPosition;
+    // MEJORA: Cargar ajustes desde el PresentationStateService
+    final settings = Provider.of<PresentationStateService>(context, listen: false).getSettingsForSong(widget.song);
+    _transpositionSemitones = settings.transposition;
+    _capoFret = settings.capo;
     WakelockPlus.enable();
   }
 
   @override
   void didChangeDependencies() {
+    // Esto se llama si el widget.song cambia (ej. en un setlist)
+    final settings = Provider.of<PresentationStateService>(context, listen: false).getSettingsForSong(widget.song);
+    _transpositionSemitones = settings.transposition;
+    _capoFret = settings.capo;
     super.didChangeDependencies();
     if (!_dependenciesInitialized) {
       _dependenciesInitialized = true;
@@ -85,6 +93,17 @@ class _PresentationScreenState extends State<PresentationScreen> {
       setState(() => _isScrollingAutomatically = true);
     }
   }
+
+  void _updatePresentationSettings() {
+    if (widget.song.id == null) return;
+    final provider = Provider.of<PresentationStateService>(context, listen: false);
+    final newSettings = PresentationSettings(
+      transposition: _transpositionSemitones,
+      capo: _capoFret,
+    );
+    provider.updateSettings(widget.song, newSettings);
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -189,8 +208,14 @@ class _PresentationScreenState extends State<PresentationScreen> {
                         const SizedBox(height: 20),
                         _buildControlGroup(
                           'Capo',
-                          () => setState(() => _capoFret = (_capoFret - 1).clamp(0, 12)),
-                          () => setState(() => _capoFret = (_capoFret + 1).clamp(0, 12)),
+                          () => setState(() {
+                            _capoFret = (_capoFret - 1).clamp(0, 12);
+                            _updatePresentationSettings();
+                          }),
+                          () => setState(() {
+                            _capoFret = (_capoFret + 1).clamp(0, 12);
+                            _updatePresentationSettings();
+                          }),
                         ),
                         const SizedBox(height: 20),
                         _buildControlGroup(
@@ -268,13 +293,19 @@ class _PresentationScreenState extends State<PresentationScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             ElevatedButton(
-              onPressed: () => setState(() => _transpositionSemitones--),
+              onPressed: () => setState(() {
+                _transpositionSemitones--;
+                _updatePresentationSettings();
+              }),
               style: ElevatedButton.styleFrom(shape: const CircleBorder(), padding: const EdgeInsets.all(15)),
               child: const Icon(Icons.remove),
             ),
             const SizedBox(width: 10),
             ElevatedButton(
-              onPressed: () => setState(() => _transpositionSemitones++),
+              onPressed: () => setState(() {
+                _transpositionSemitones++;
+                _updatePresentationSettings();
+              }),
               style: ElevatedButton.styleFrom(shape: const CircleBorder(), padding: const EdgeInsets.all(15)),
               child: const Icon(Icons.add),
             ),
