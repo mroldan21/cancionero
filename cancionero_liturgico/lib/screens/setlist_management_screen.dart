@@ -82,62 +82,6 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
     Navigator.pop(context, true);
   }
 
-  Future<void> _editSetlistItem(int index) async {
-    final item = _selectedItems[index];
-    int tempTransposition = item.transposition;
-    int tempCapo = item.capo ?? 0;
-
-    final result = await showDialog<Map<String, int>>(
-      context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setStateDialog) {
-            return AlertDialog(
-              title: Text('Ajustes para "${item.song.title}"'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Transposición: ${tempTransposition > 0 ? '+' : ''}$tempTransposition'),
-                  Slider(
-                    value: tempTransposition.toDouble(),
-                    min: -11,
-                    max: 11,
-                    divisions: 22,
-                    label: '${tempTransposition > 0 ? '+' : ''}$tempTransposition',
-                    onChanged: (value) => setStateDialog(() => tempTransposition = value.round()),
-                  ),
-                  const SizedBox(height: 16),
-                  Text('Capo: ${tempCapo > 0 ? 'Traste $tempCapo' : 'No'}'),
-                  Slider(
-                    value: tempCapo.toDouble(),
-                    min: 0,
-                    max: 12,
-                    divisions: 12,
-                    label: tempCapo > 0 ? tempCapo.toString() : 'No',
-                    onChanged: (value) => setStateDialog(() => tempCapo = value.round()),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-                TextButton(
-                  onPressed: () => Navigator.pop(context, {'transposition': tempTransposition, 'capo': tempCapo}),
-                  child: const Text('Aplicar'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    if (result != null) {
-      setState(() {
-        _selectedItems[index] = SetlistItem(song: item.song, order: item.order, transposition: result['transposition']!, capo: result['capo']);
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -225,34 +169,20 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
                   title: Text(song.title),
                   subtitle: Builder(
                     builder: (context) {
-                      List<String> parts = [];
-                      parts.add('Tono: ${song.originalKey}');
-                      if (item.capo != null && item.capo! > 0) {
-                        parts.add('Capo: ${item.capo}');
-                      }
-                      if (item.transposition != 0) {
-                        parts.add('Transp: ${item.transposition > 0 ? '+' : ''}${item.transposition}');
-                      }
-                      return Text(parts.join(' | '));
+                      // Ahora el capo se lee directamente de la canción
+                      final capoText = song.capoPosition > 0 ? 'Capo: ${song.capoPosition}' : null;
+                      final keyText = 'Tono: ${song.originalKey}';
+                      return Text(capoText != null ? '$keyText | $capoText' : keyText);
                     },
                   ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit),
-                        tooltip: 'Editar Tono/Capo',
-                        onPressed: () => _editSetlistItem(index),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete),
-                        onPressed: () {
-                          setState(() {
-                            _selectedItems.removeAt(index);
-                          });
-                        },
-                      ),
-                    ],
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete),
+                    tooltip: 'Quitar de la lista',
+                    onPressed: () {
+                      setState(() {
+                        _selectedItems.removeAt(index);
+                      });
+                    },
                   ),
                 );
               },
@@ -294,8 +224,6 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
                       _selectedItems.add(SetlistItem(
                         song: song,
                         order: _selectedItems.length + 1, // El orden se recalculará al guardar
-                        transposition: 0, // Valor por defecto
-                        capo: song.capoPosition, // CORRECCIÓN: Tomar el capo por defecto de la canción
                       ));
                     });
                   },
