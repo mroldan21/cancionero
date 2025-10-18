@@ -101,6 +101,7 @@ class _SongEditScreenState extends State<SongEditScreen> {
           isFavorite: widget.song?.isFavorite ?? false, // El favorito se cambia en la vista de detalle
           playCount: widget.song?.playCount ?? 0,
           creationDate: widget.song?.creationDate ?? DateTime.now(),
+          preferredFontSize: widget.song?.preferredFontSize, // SOLUCIÓN: Preservar el valor existente
           modificationDate: DateTime.now(),
         );
 

@@ -120,10 +120,8 @@ class _SongListScreenState extends State<SongListScreen> {
                         title: Text(song.title),
                         subtitle: Text(song.author ?? 'Autor desconocido'),
                         onTap: () {
-                          // SOLUCIÓN: Limpiamos el provider y luego establecemos la nueva canción.
-                          // Esto asegura que SongDetailScreen no use una versión "en caché" del provider.
-                          final songProvider = Provider.of<SongProvider>(context, listen: false);
-                          songProvider.setSelectedSong(song);
+                          // SOLUCIÓN: No es necesario establecer la canción en el provider aquí.
+                          // SongDetailScreen la recibirá a través del constructor (widget.song).
                           // Y usamos el método que refresca la lista al volver.
                           _navigateAndRefreshSongs(SongDetailScreen(song: song)); // CORRECCIÓN: Usar el método que refresca
                         },

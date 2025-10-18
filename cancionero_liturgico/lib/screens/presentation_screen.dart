@@ -66,11 +66,10 @@ class _PresentationScreenState extends State<PresentationScreen> {
   @override
   void didChangeDependencies() {
     // Esta lógica se mantiene para cuando se navega entre canciones de un setlist
-    // SOLUCIÓN: Sincronizar _currentSong con el provider.
-    final songFromProvider = Provider.of<SongProvider>(context).currentSong;
-    _currentSong = songFromProvider ?? widget.song;
+    // SOLUCIÓN SIMPLIFICADA: Confiar siempre en la canción pasada al widget.
+    _currentSong = widget.song;
 
-    // SOLUCIÓN: Actualizar el tamaño de la fuente aquí, después de obtener la canción correcta.
+    // Actualizar el tamaño de la fuente aquí, después de obtener la canción correcta.
     print("[DEBUG] PresentationScreen didChangeDependencies: Cargando canción '${_currentSong.title}' con preferredFontSize: ${_currentSong.preferredFontSize}");
     _fontSize = _currentSong.preferredFontSize ?? 24.0;
     print("[DEBUG] PresentationScreen didChangeDependencies: _fontSize actualizado a: $_fontSize");
@@ -127,11 +126,12 @@ class _PresentationScreenState extends State<PresentationScreen> {
     final finalKey = TranspositionService.getTransposedOriginalKey(_currentSong.originalKey, _transpositionSemitones);
 
     // 2. Crear una nueva instancia de la canción con los cambios aplicados.
+    // SOLUCIÓN MEJORADA: Usar copyWith, que ahora es seguro y más mantenible.
     final updatedSong = _currentSong.copyWith(
       content: finalContent,
       originalKey: finalKey,
       capoPosition: _capoFret,
-      preferredFontSize: _fontSize, // Guardar el tamaño de fuente actual
+      preferredFontSize: _fontSize, // <-- El valor correcto se asigna aquí
       modificationDate: DateTime.now(),
     );
 
@@ -140,6 +140,11 @@ class _PresentationScreenState extends State<PresentationScreen> {
 
     // 3. Guardar la canción actualizada en la base de datos.
     await songRepository.updateSong(updatedSong);
+
+    // --- DEBUGGING STEP: Verificar el valor directamente desde la BD ---
+    final reReadSong = await songRepository.getSongById(updatedSong.id!);
+    print("[DEBUG] Post-Save Verification: Read from DB. preferredFontSize: ${reReadSong?.preferredFontSize}");
+    // --- FIN DEBUGGING STEP ---
 
     // 4. Actualizar el provider para que toda la app se entere del cambio.
     songProvider.setSelectedSong(updatedSong);

@@ -24,27 +24,7 @@ class SongDetailScreen extends StatefulWidget {
 }
 
 class _SongDetailScreenState extends State<SongDetailScreen> {
-  late Song _currentSong;
-
-  @override
-  void initState() {
-    super.initState();
-    // Usamos el estado local para la canción, asegurando que siempre se muestre la correcta.
-    _currentSong = widget.song;
-    // Si estamos en modo setlist, nos aseguramos que el provider esté sincronizado.
-  }
-
-  // SOLUCIÓN: Usar didUpdateWidget para mantener el estado sincronizado.
-  // Este método se llama cuando el widget es reconstruido con nuevos parámetros,
-  // como cuando se navega entre canciones de un setlist o se vuelve a la pantalla
-  // con una versión actualizada de la canción desde SongListScreen.
-  @override
-  void didUpdateWidget(covariant SongDetailScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.song != oldWidget.song) {
-      _currentSong = widget.song;
-    }
-  }
+  // No se necesita estado local para la canción, se manejará directamente en el build.
 
   void _goToNextSong() {
     if (widget.setlistItems == null) return;
@@ -73,12 +53,12 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
   }
 
   void _toggleFavorite() {
+    // Usamos widget.song.id porque es la referencia inmutable que recibimos.
     final songRepository = Provider.of<SongRepository>(context, listen: false);
-    songRepository.toggleFavorite(_currentSong.id!);
-    setState(() {
-      // Usar copyWith es más seguro y limpio
-      _currentSong = _currentSong.copyWith(isFavorite: !_currentSong.isFavorite);
-    });
+    songRepository.toggleFavorite(widget.song.id!);
+    // El refresco se hará a través del provider o al recargar la lista,
+    // pero para una respuesta visual inmediata, podríamos llamar a setState
+    // y recargar la canción desde la BD. Por ahora, se delega al flujo de datos.
   }
 
   @override
@@ -88,29 +68,48 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
     final isSetlistMode = widget.setlistItems?.isNotEmpty ?? false;
 
     // Escuchamos siempre al provider para reaccionar a cambios (next/previous y guardado).
-    final songProvider = Provider.of<SongProvider>(context);
+    final songProvider = Provider.of<SongProvider>(context, listen: true);
     final songRepository = Provider.of<SongRepository>(context, listen: false); // No necesita escuchar
 
-    // Esta lógica se mantiene y es correcta para reaccionar a los cambios
-    // INMEDIATOS después de guardar en PresentationScreen, ya que el provider
-    // se actualiza y notifica a esta pantalla.
+    // SOLUCIÓN DEFINITIVA: Determinar la fuente de verdad para la canción a mostrar.
+    // 1. Prioridad: La canción en el provider, si existe y coincide con la del widget.
+    //    Esto asegura que veamos los cambios inmediatamente después de guardar.
+    // 2. Si no, usar la canción que se pasó al widget.
+    // SOLUCIÓN CORREGIDA: La fuente de verdad principal es la canción del widget.
+    // Solo la sobrescribimos con la del provider si esta es demostrablemente MÁS NUEVA
+    // (lo que ocurre al volver de PresentationScreen después de guardar).
+    Song currentSong = widget.song; // Empezamos con la canción que nos pasan.
     if (songProvider.currentSong != null &&
-        songProvider.currentSong!.id == _currentSong.id &&
-        songProvider.currentSong!.modificationDate.isAfter(_currentSong.modificationDate)) {
-      // Usamos un post-frame callback para actualizar el estado de forma segura
-      // después de que el frame actual se haya construido.
-      WidgetsBinding.instance.addPostFrameCallback((_) => setState(() => _currentSong = songProvider.currentSong!));
+        songProvider.currentSong!.id == widget.song.id &&
+        songProvider.currentSong!.modificationDate.isAfter(currentSong.modificationDate)) {
+      currentSong = songProvider.currentSong!;
     }
 
-    final currentSong = _currentSong; // Usar siempre el estado local actualizado.
-
     // Usamos PopScope para interceptar la navegación hacia atrás y limpiar el estado.
-    print("[DEBUG] SongDetailScreen build: Mostrando canción '${currentSong.title}' con preferredFontSize: ${currentSong.preferredFontSize}");
+    // SOLICITUD: Imprimir todos los parámetros de la canción para depuración.
+    print("""
+[DEBUG] SongDetailScreen build:
+  - Song ID: ${currentSong.id}
+  - Title: ${currentSong.title}
+  - Author: ${currentSong.author}
+  - Original Key: ${currentSong.originalKey}
+  - Tempo: ${currentSong.tempoBpm}
+  - Capo: ${currentSong.capoPosition}
+  - Favorite: ${currentSong.isFavorite}
+  - Play Count: ${currentSong.playCount}
+  - Creation Date: ${currentSong.creationDate.toIso8601String()}
+  - Modification Date: ${currentSong.modificationDate.toIso8601String()}
+  - preferredFontSize: ${currentSong.preferredFontSize}
+"""); // Fin del print de depuración
     return PopScope(
       canPop: true, // Permitir siempre la navegación hacia atrás.
       onPopInvoked: (didPop) {
-        if (didPop && isSetlistMode) {
-          Provider.of<SongProvider>(context, listen: false).clearSetlistItem();
+        // SOLUCIÓN: Al salir de esta pantalla, limpiar el estado del provider.
+        // Esto evita que otras pantallas (como PresentationScreen) usen datos obsoletos.
+        if (didPop) {
+          final songProvider = Provider.of<SongProvider>(context, listen: false);
+          if (isSetlistMode) songProvider.clearSetlistItem();
+          songProvider.clearSelectedSong(); // Limpiar la canción seleccionada
         }
       },
       child: Scaffold(
@@ -147,10 +146,8 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
                     // Recargar la canción desde la base de datos
                     final updatedSong = await songRepository.getSongById(currentSong.id!);
                     if (updatedSong != null) {
-                      // Actualizar el provider para refrescar la pantalla
-                      setState(() {
-                        _currentSong = updatedSong;
-                      });
+                      // Actualizar el provider para que la UI reaccione.
+                    Provider.of<SongProvider>(context, listen: false).setSelectedSong(updatedSong);
                     }
                   }
                 });

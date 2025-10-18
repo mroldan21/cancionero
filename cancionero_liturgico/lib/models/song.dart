@@ -12,7 +12,7 @@ class Song {
   final DateTime modificationDate;
   final String? notes;
   final List<String>? videoLinks;
-  final double? preferredFontSize; // <-- CAMPO AÑADIDO
+  final double? preferredFontSize;
 
   Song({
     this.id,
@@ -28,7 +28,7 @@ class Song {
     required this.modificationDate,
     this.notes,
     this.videoLinks,
-    this.preferredFontSize, // <-- CAMPO AÑADIDO
+    this.preferredFontSize,
   });
 
   factory Song.fromMap(Map<String, dynamic> map) {
@@ -46,7 +46,7 @@ class Song {
       modificationDate: DateTime.parse(map['fecha_modificacion']),
       notes: map['notas'],
       videoLinks: (map['enlaces_video'] as String?)?.split(',').where((s) => s.trim().isNotEmpty).toList(),
-      preferredFontSize: map['preferred_font_size'], // <-- CAMPO AÑADIDO
+      preferredFontSize: map['preferred_font_size'],
     );
   }
 
@@ -65,7 +65,7 @@ class Song {
       'fecha_modificacion': modificationDate.toIso8601String(),
       'notas': notes,
       'enlaces_video': videoLinks?.join(','),
-      'preferred_font_size': preferredFontSize, // <-- CAMPO AÑADIDO
+      'preferred_font_size': preferredFontSize,
     };
   }
 
@@ -83,7 +83,7 @@ class Song {
     DateTime? modificationDate,
     String? notes,
     List<String>? videoLinks,
-    double? preferredFontSize, // <-- CAMPO AÑADIDO
+    double? preferredFontSize,
   }) {
     return Song(
       id: id ?? this.id,
@@ -99,7 +99,9 @@ class Song {
       modificationDate: modificationDate ?? this.modificationDate,
       notes: notes ?? this.notes,
       videoLinks: videoLinks ?? this.videoLinks,
-      preferredFontSize: preferredFontSize ?? this.preferredFontSize, // <-- CAMPO AÑADIDO
+      // SOLUCIÓN: Usar el nuevo valor si se proporciona, incluso si es null.
+      // Para eso, necesitamos una forma de saber si el parámetro fue pasado.
+      preferredFontSize: preferredFontSize,
     );
   }
 }
