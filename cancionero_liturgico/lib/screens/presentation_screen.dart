@@ -208,6 +208,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
                         const SizedBox(height: 20),
                         _buildControlGroup(
                           'Capo',
+                          Icons.straighten,
                           () => setState(() {
                             _capoFret = (_capoFret - 1).clamp(0, 12);
                             _updatePresentationSettings();
@@ -220,6 +221,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
                         const SizedBox(height: 20),
                         _buildControlGroup(
                           'Fuente',
+                          Icons.format_size,
                           () => setState(() {
                             _fontSize = (_fontSize - 2).clamp(12.0, 64.0);
                             if (_dependenciesInitialized) _scrollAutoController.setFontSize(_fontSize);
@@ -232,6 +234,7 @@ class _PresentationScreenState extends State<PresentationScreen> {
                         const SizedBox(height: 20),
                         _buildControlGroup(
                           'Velocidad',
+                          Icons.speed,
                           () {
                             if (!_dependenciesInitialized) return;
                             _scrollAutoController.decreaseSpeed();
@@ -315,16 +318,25 @@ class _PresentationScreenState extends State<PresentationScreen> {
     );
   }
 
-  Widget _buildControlGroup(String title, VoidCallback onRemove, VoidCallback onAdd) {
+  Widget _buildControlGroup(String title, IconData icon, VoidCallback onRemove, VoidCallback onAdd) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     return Column(
       children: [
-        Text(title, style: TextStyle(color: themeProvider.isDarkMode ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            IconButton(icon: Icon(Icons.remove, color: themeProvider.isDarkMode ? Colors.white : Colors.black), onPressed: onRemove),
-            IconButton(icon: Icon(Icons.add, color: themeProvider.isDarkMode ? Colors.white : Colors.black), onPressed: onAdd),
+            Icon(icon, color: themeProvider.isDarkMode ? Colors.white : Colors.black),
+            const SizedBox(width: 8),
+            Text(title, style: TextStyle(color: themeProvider.isDarkMode ? Colors.white : Colors.black, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(onPressed: onRemove, style: ElevatedButton.styleFrom(shape: const CircleBorder(), padding: const EdgeInsets.all(12)), child: const Icon(Icons.remove)),
+            const SizedBox(width: 10),
+            ElevatedButton(onPressed: onAdd, style: ElevatedButton.styleFrom(shape: const CircleBorder(), padding: const EdgeInsets.all(12)), child: const Icon(Icons.add)),
           ],
         ),
       ],

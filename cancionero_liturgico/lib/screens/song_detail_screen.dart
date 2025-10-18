@@ -60,6 +60,16 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
     }
   }
 
+  void _toggleFavorite() {
+    final songRepository = Provider.of<SongRepository>(context, listen: false);
+    songRepository.toggleFavorite(_currentSong.id!);
+    setState(() {
+      _currentSong = Song(
+        id: _currentSong.id, title: _currentSong.title, author: _currentSong.author, content: _currentSong.content, originalKey: _currentSong.originalKey, tempoBpm: _currentSong.tempoBpm, capoPosition: _currentSong.capoPosition, isFavorite: !_currentSong.isFavorite, playCount: _currentSong.playCount, creationDate: _currentSong.creationDate, modificationDate: _currentSong.modificationDate, notes: _currentSong.notes, videoLinks: _currentSong.videoLinks
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     print("[SCREEN] Build: SongDetailScreen");
@@ -95,8 +105,7 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
             IconButton(
               icon: Icon(currentSong.isFavorite ? Icons.star : Icons.star_border),
               onPressed: () {
-                // TODO: Actualizar el estado de favorito visualmente al instante
-                songRepository.toggleFavorite(currentSong.id!);
+                _toggleFavorite();
               },
             ),
             IconButton(
@@ -229,85 +238,17 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
                 ),
               )
             : null,
-        floatingActionButton: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            FloatingActionButton(
-              heroTag: 'transpose_song',
-              onPressed: () async {
-                int transposition = 0;
-                await showDialog<int>(
-                  context: context,
-                  builder: (BuildContext context) {
-                    return AlertDialog(
-                      title: const Text('Transponer Canción'),
-                      content: StatefulBuilder(
-                        builder: (BuildContext context, StateSetter setState) {
-                          return Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('Selecciona la transposición en semitonos:'),
-                              Slider(
-                                value: transposition.toDouble(),
-                                min: -11,
-                                max: 11,
-                                divisions: 22,
-                                label: transposition.toString(),
-                                onChanged: (value) {
-                                  setState(() {
-                                    transposition = value.round();
-                                  });
-                                },
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancelar'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            String newContent = TranspositionService.transposeContent(currentSong.content, transposition);
-                            String newOriginalKey = TranspositionService.getTransposedOriginalKey(currentSong.originalKey, transposition);
-                            Song updatedSong = Song(
-                              id: currentSong.id,
-                              title: currentSong.title,
-                              author: currentSong.author,
-                              content: newContent,
-                              originalKey: newOriginalKey,
-                              tempoBpm: currentSong.tempoBpm,
-                              capoPosition: currentSong.capoPosition,
-                              isFavorite: currentSong.isFavorite,
-                              playCount: currentSong.playCount,
-                              creationDate: currentSong.creationDate,
-                              modificationDate: DateTime.now(),
-                              notes: currentSong.notes,
-                              videoLinks: currentSong.videoLinks,
-                            );
-                            songRepository.updateSong(updatedSong);
-                            Navigator.pop(context, transposition);
-                          },
-                          child: const Text('Aplicar'),
-                        ),
-                      ],
-                    );
-                  },
-                );
-              },
-              child: const Icon(Icons.tune),
-            ),
-            const SizedBox(width: 8),
-            FloatingActionButton(
-              heroTag: 'reset_transpose',
-              onPressed: () {
-                print("Resetear transposición no implementado sin datos originales.");
-              },
-              child: const Icon(Icons.refresh),
-            ),
-          ],
+        floatingActionButton: FloatingActionButton(
+          heroTag: 'play_presentation',
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PresentationScreen(song: currentSong),
+              ),
+            );
+          },
+          child: const Icon(Icons.play_arrow),
         ),
         floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       ),
