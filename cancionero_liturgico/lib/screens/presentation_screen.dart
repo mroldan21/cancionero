@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:ui'; // For BackdropFilter
+import 'package:cancionero_liturgico/models/setlist.dart';
 
 import 'package:cancionero_liturgico/models/song.dart';
 import 'package:cancionero_liturgico/services/song_provider.dart';
@@ -14,12 +15,14 @@ import 'package:cancionero_liturgico/services/song_repository.dart';
 
 class PresentationScreen extends StatefulWidget {
   final Song song;
+  final SetlistItem? setlistItem; // Nuevo: para recibir la configuración del setlist
   final VoidCallback? onNextSong;
   final VoidCallback? onPreviousSong;
 
   const PresentationScreen({
     super.key,
     required this.song,
+    this.setlistItem,
     this.onNextSong,
     this.onPreviousSong,
   });
@@ -43,15 +46,21 @@ class _PresentationScreenState extends State<PresentationScreen> {
   @override
   void initState() {
     super.initState();
-    // MEJORA: Cargar ajustes desde el PresentationStateService
-    final settings = Provider.of<PresentationStateService>(context, listen: false).getSettingsForSong(widget.song);
-    _transpositionSemitones = settings.transposition;
-    _capoFret = settings.capo;
+    // Si se proporciona un setlistItem, usar sus valores. Si no, cargar los guardados.
+    if (widget.setlistItem != null) {
+      _transpositionSemitones = widget.setlistItem!.transposition;
+      _capoFret = widget.setlistItem!.capo ?? 0;
+    } else {
+      final settings = Provider.of<PresentationStateService>(context, listen: false).getSettingsForSong(widget.song);
+      _transpositionSemitones = settings.transposition;
+      _capoFret = settings.capo;
+    }
     WakelockPlus.enable();
   }
 
   @override
   void didChangeDependencies() {
+    // Esta lógica se mantiene para cuando se navega entre canciones de un setlist
     // Esto se llama si el widget.song cambia (ej. en un setlist)
     final settings = Provider.of<PresentationStateService>(context, listen: false).getSettingsForSong(widget.song);
     _transpositionSemitones = settings.transposition;

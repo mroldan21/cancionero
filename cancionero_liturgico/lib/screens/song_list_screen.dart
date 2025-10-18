@@ -91,7 +91,8 @@ class _SongListScreenState extends State<SongListScreen> {
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () {
-              _navigateAndRefreshSongs(const SongEditScreen());
+              // Para crear una nueva canción, se navega a SongEditScreen sin pasarle una canción.
+              _navigateAndRefreshSongs(SongEditScreen());
             },
           ),
         ],
@@ -106,27 +107,24 @@ class _SongListScreenState extends State<SongListScreen> {
                 } else {
                   final songs = snapshot.data ?? [];
                   return ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 8.0),
                     itemCount: songs.length,
                     itemBuilder: (context, index) {
-                      final song = songs[index];                      // MEJORA: Envolver con Semantics para accesibilidad
-                      return Semantics(
-                        label: 'Canción: ${song.title}, Tono: ${song.originalKey}',
-                        hint: 'Toca para ver detalles, mantén presionado para editar.',
-                        button: true,
-                        child: SongItem(
-                          key: ValueKey(song.id), // **MEJORA: Añadir Key para optimización de renderizado**
-                          song: song,
-                          onTap: () {
-                            // **LA CORRECCIÓN: Establecer la canción seleccionada en el provider**
-                            Provider.of<SongProvider>(context, listen: false).setSelectedSong(song);
-                            _navigateAndRefreshSongs(SongDetailScreen(song: song));
-                          },
-                          onLongPress: () {
-                            // Opción de edición en presión larga
-                            // MEJORA: Usar el método que refresca la lista al volver
-                            _navigateAndRefreshSongs(SongEditScreen(song: song));
-                          },
+                      final song = songs[index];
+                      return ListTile(
+                        key: ValueKey(song.id),
+                        leading: CircleAvatar(
+                          child: Text('${index + 1}'),
                         ),
+                        title: Text(song.title),
+                        subtitle: Text(song.author ?? 'Autor desconocido'),
+                        onTap: () {
+                          Provider.of<SongProvider>(context, listen: false).setSelectedSong(song);
+                          _navigateAndRefreshSongs(SongDetailScreen(song: song));
+                        },
+                        onLongPress: () {
+                          _navigateAndRefreshSongs(SongEditScreen(song: song));
+                        },
                       );
                     },
                   );

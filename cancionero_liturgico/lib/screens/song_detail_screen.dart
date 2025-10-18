@@ -244,7 +244,11 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => PresentationScreen(song: currentSong),
+                // Si estamos en modo setlist, pasamos el SetlistItem para usar su configuración.
+                builder: (context) => PresentationScreen(
+                  song: currentSong,
+                  setlistItem: songProvider.isCurrentSongFromSetlist ? songProvider.currentSetlistItem : null,
+                ),
               ),
             );
           },

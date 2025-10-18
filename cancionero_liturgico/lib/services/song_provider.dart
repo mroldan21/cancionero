@@ -22,6 +22,9 @@ class SongProvider with ChangeNotifier {
     return _selectedSong;
   }
 
+  // Nuevo getter para acceder al SetlistItem completo
+  SetlistItem? get currentSetlistItem => _selectedSetlistItem;
+
   // Nuevo getter: Transposición aplicada a la canción actual (0 si es individual, personalizada si es de setlist)
   int get currentTransposition {
     if (_selectedSetlistItem != null) {

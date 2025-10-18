@@ -82,6 +82,62 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
     Navigator.pop(context, true);
   }
 
+  Future<void> _editSetlistItem(int index) async {
+    final item = _selectedItems[index];
+    int tempTransposition = item.transposition;
+    int tempCapo = item.capo ?? 0;
+
+    final result = await showDialog<Map<String, int>>(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: Text('Ajustes para "${item.song.title}"'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Transposición: ${tempTransposition > 0 ? '+' : ''}$tempTransposition'),
+                  Slider(
+                    value: tempTransposition.toDouble(),
+                    min: -11,
+                    max: 11,
+                    divisions: 22,
+                    label: '${tempTransposition > 0 ? '+' : ''}$tempTransposition',
+                    onChanged: (value) => setStateDialog(() => tempTransposition = value.round()),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('Capo: ${tempCapo > 0 ? 'Traste $tempCapo' : 'No'}'),
+                  Slider(
+                    value: tempCapo.toDouble(),
+                    min: 0,
+                    max: 12,
+                    divisions: 12,
+                    label: tempCapo > 0 ? tempCapo.toString() : 'No',
+                    onChanged: (value) => setStateDialog(() => tempCapo = value.round()),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, {'transposition': tempTransposition, 'capo': tempCapo}),
+                  child: const Text('Aplicar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result != null) {
+      setState(() {
+        _selectedItems[index] = SetlistItem(song: item.song, order: item.order, transposition: result['transposition']!, capo: result['capo']);
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -136,9 +192,7 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Notas',
                     border: OutlineInputBorder(),
-                    alignLabelWithHint: true,
                   ),
-                  maxLines: 3,
                 ),
               ],
             ),
@@ -162,18 +216,43 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
               itemBuilder: (context, index) {
                 final item = _selectedItems[index];
                 final song = item.song;
+                // SOLUCIÓN: Usar ObjectKey(item) para garantizar una clave única incluso si la canción se repite.
                 return ListTile(
-                  key: ValueKey(song.id),
+                  key: ObjectKey(item),
+                  leading: CircleAvatar(
+                    child: Text('${index + 1}'),
+                  ),
                   title: Text(song.title),
-                  // MEJORA: Mostrar transposición y capo si son diferentes de los valores por defecto
-                  subtitle: Text('Tono: ${song.originalKey} ${item.transposition != 0 ? '(Transp: ${item.transposition > 0 ? '+' : ''}${item.transposition})' : ''} ${item.capo != null ? '(Capo: ${item.capo})' : ''}'),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete),
-                    onPressed: () {
-                      setState(() {
-                        _selectedItems.removeAt(index);
-                      });
+                  subtitle: Builder(
+                    builder: (context) {
+                      List<String> parts = [];
+                      parts.add('Tono: ${song.originalKey}');
+                      if (item.capo != null && item.capo! > 0) {
+                        parts.add('Capo: ${item.capo}');
+                      }
+                      if (item.transposition != 0) {
+                        parts.add('Transp: ${item.transposition > 0 ? '+' : ''}${item.transposition}');
+                      }
+                      return Text(parts.join(' | '));
                     },
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit),
+                        tooltip: 'Editar Tono/Capo',
+                        onPressed: () => _editSetlistItem(index),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete),
+                        onPressed: () {
+                          setState(() {
+                            _selectedItems.removeAt(index);
+                          });
+                        },
+                      ),
+                    ],
                   ),
                 );
               },

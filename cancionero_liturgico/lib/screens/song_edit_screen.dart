@@ -1,108 +1,96 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:cancionero_liturgico/models/song.dart';
-import 'package:cancionero_liturgico/models/category.dart';
-import 'package:cancionero_liturgico/services/song_repository.dart';
-import 'package:cancionero_liturgico/services/category_repository.dart';
+import '../models/song.dart';
+import '../services/song_repository.dart';
 
 class SongEditScreen extends StatefulWidget {
-  final Song? song; // Si es null, es una nueva canción
+  // La canción es opcional. Si es null, es una nueva canción.
+  final Song? song;
 
-  const SongEditScreen({super.key, this.song});
+  // El constructor ya no es 'const'
+  const SongEditScreen({Key? key, this.song}) : super(key: key);
 
   @override
-  State<SongEditScreen> createState() => _SongEditScreenState();
+  _SongEditScreenState createState() => _SongEditScreenState();
 }
 
 class _SongEditScreenState extends State<SongEditScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _titleController;
   late TextEditingController _authorController;
-  late TextEditingController _contentController;
   late TextEditingController _originalKeyController;
   late TextEditingController _tempoController;
   late TextEditingController _capoController;
+  late TextEditingController _contentController;
   late TextEditingController _notesController;
-  late List<String> _videoLinks = []; // Lista de enlaces de video
-  late String _tempVideoLink = ''; // Campo temporal para ingresar un nuevo enlace
-
-  List<Category> _allCategories = [];
-  final List<int> _selectedCategoryIds = []; // IDs de categorías seleccionadas
+  late TextEditingController _videoLinksController;
 
   @override
   void initState() {
     super.initState();
-    _titleController = TextEditingController(text: widget.song?.title);
-    _authorController = TextEditingController(text: widget.song?.author);
-    _contentController = TextEditingController(text: widget.song?.content);
-    _originalKeyController = TextEditingController(text: widget.song?.originalKey);
-    _tempoController = TextEditingController(text: widget.song?.tempoBpm?.toString());
-    _capoController = TextEditingController(text: widget.song?.capoPosition.toString());
-    _notesController = TextEditingController(text: widget.song?.notes);
-    _videoLinks = widget.song?.videoLinks ?? [];
-
-    // Cargar categorías y seleccionar las actuales de la canción
-    _loadCategoriesAndSelections();
+    // Si estamos editando, rellenar los campos. Si no, se quedan vacíos.
+    _titleController = TextEditingController(text: widget.song?.title ?? '');
+    _authorController = TextEditingController(text: widget.song?.author ?? '');
+    _originalKeyController = TextEditingController(text: widget.song?.originalKey ?? '');
+    _tempoController = TextEditingController(text: widget.song?.tempoBpm?.toString() ?? '');
+    _capoController = TextEditingController(text: widget.song?.capoPosition?.toString() ?? '0');
+    _contentController = TextEditingController(text: widget.song?.content ?? '');
+    _notesController = TextEditingController(text: widget.song?.notes ?? '');
+    _videoLinksController = TextEditingController(text: widget.song?.videoLinks?.join(', ') ?? '');
   }
 
-  Future<void> _loadCategoriesAndSelections() async {
-    final categories = await Provider.of<CategoryRepository>(context, listen: false).getAllCategories();
-    setState(() {
-      _allCategories = categories;
-      // Si es edición, cargar las categorías actuales
-      if (widget.song != null) {
-        // Aquí necesitarías un método en SongRepository para obtener los IDs de categorías de una canción
-        // Por ahora, asumimos que se puede hacer o se maneja previamente
-        // _selectedCategoryIds = await Provider.of<SongRepository>(context, listen: false).getCategoriaIdsForSong(widget.song!.id!);
-        // Este paso puede requerir una llamada asíncrona adicional o manejo diferente
-        // Se omite temporalmente para simplificar, pero es crucial para la funcionalidad completa.
-      }
-    });
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _authorController.dispose();
+    _originalKeyController.dispose();
+    _tempoController.dispose();
+    _capoController.dispose();
+    _contentController.dispose();
+    _notesController.dispose();
+    _videoLinksController.dispose();
+    super.dispose();
   }
 
   Future<void> _saveSong() async {
     if (_formKey.currentState!.validate()) {
-      final songRepository = Provider.of<SongRepository>(context, listen: false);
-      int? tempoBpm;
-      int capoPosition = 0;
       try {
-        tempoBpm = int.tryParse(_tempoController.text);
-        capoPosition = int.tryParse(_capoController.text) ?? 0;
+        final songRepository = Provider.of<SongRepository>(context, listen: false);
+        
+        // Crear o actualizar la canción
+        final songToSave = Song(
+          id: widget.song?.id,
+          title: _titleController.text,
+          author: _authorController.text.isNotEmpty ? _authorController.text : null,
+          originalKey: _originalKeyController.text.isNotEmpty ? _originalKeyController.text : 'C',
+          tempoBpm: int.tryParse(_tempoController.text),
+          capoPosition: int.tryParse(_capoController.text) ?? 0,
+          content: _contentController.text,
+          notes: _notesController.text.isNotEmpty ? _notesController.text : null,
+          videoLinks: _videoLinksController.text.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList(),
+          
+          // Campos que no se editan aquí pero deben mantenerse
+          isFavorite: widget.song?.isFavorite ?? false, // El favorito se cambia en la vista de detalle
+          playCount: widget.song?.playCount ?? 0,
+          creationDate: widget.song?.creationDate ?? DateTime.now(),
+          modificationDate: DateTime.now(),
+        );
+
+        if (songToSave.id != null) {
+          await songRepository.updateSong(songToSave);
+        } else {
+          await songRepository.insertSong(songToSave);
+        }
+        Navigator.of(context).pop(true); // Devuelve 'true' para indicar éxito
+        
       } catch (e) {
-        // Manejar error de parseo
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error: Tempo o Capo inválidos')));
-        return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al guardar: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
-
-      final song = Song(
-        id: widget.song?.id, // Mantener ID si es edición
-        title: _titleController.text,
-        author: _authorController.text.isEmpty ? null : _authorController.text,
-        content: _contentController.text,
-        originalKey: _originalKeyController.text,
-        tempoBpm: tempoBpm,
-        capoPosition: capoPosition,
-        isFavorite: widget.song?.isFavorite ?? false, // Mantener estado de favorito o inicializar
-        playCount: widget.song?.playCount ?? 0, // Mantener contador o inicializar
-        creationDate: widget.song?.creationDate ?? DateTime.now(), // Mantener o inicializar
-        modificationDate: DateTime.now(), // Actualizar fecha de modificación
-        notes: _notesController.text.isEmpty ? null : _notesController.text,
-        videoLinks: _videoLinks.isEmpty ? null : _videoLinks,
-      );
-
-      if (widget.song?.id != null) {
-        await songRepository.updateSong(song);
-        // Actualizar categorías asociadas
-        await songRepository.setCategoriasForSong(song.id!, _selectedCategoryIds);
-      } else {
-        await songRepository.insertSong(song);
-        // Asociar categorías a la nueva canción (necesita el ID recién insertado)
-        // Esto puede requerir un ajuste en song_repository para devolver el ID o manejarlo allí
-        // Por ahora, se asume que setCategoriasForSong maneja la inserción y obtención del ID internomente
-        // await songRepository.setCategoriasForSong(insertedId, _selectedCategoryIds);
-      }
-      // MEJORA: Volver a la pantalla anterior con un resultado exitoso
-      Navigator.pop(context, true);
     }
   }
 
@@ -110,195 +98,184 @@ class _SongEditScreenState extends State<SongEditScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.song != null ? 'Editar Canción' : 'Nueva Canción'),
+        title: Text( // El título cambia si estamos creando o editando
+          widget.song == null ? 'Nueva Canción' : 'Editar Canción',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        backgroundColor: Theme.of(context).primaryColor,
+        elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(Icons.save),
+            icon: Icon(Icons.save, color: Colors.white),
             onPressed: _saveSong,
+            tooltip: 'Guardar canción',
           ),
         ],
       ),
-      body: Form(
-        key: _formKey,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: SingleChildScrollView( // Permite desplazamiento si el contenido es largo
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextFormField(
-                  controller: _titleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Título *',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Por favor ingresa un título';
-                    }
-                    return null;
-                  },
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: ListView(
+            children: [
+              // Campo de título
+              TextFormField(
+                controller: _titleController,
+                decoration: InputDecoration(
+                  labelText: 'Título *',
+                  border: OutlineInputBorder(),
+                  hintText: 'Ingresa el título de la canción',
                 ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _authorController,
-                  decoration: const InputDecoration(
-                    labelText: 'Autor',
-                    border: OutlineInputBorder(),
-                  ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'El título es obligatorio';
+                  }
+                  return null;
+                },
+              ),
+              SizedBox(height: 16),
+              TextFormField(
+                controller: _authorController,
+                decoration: InputDecoration(
+                  labelText: 'Autor',
+                  border: OutlineInputBorder(),
+                  hintText: 'Ej: Juan Pérez',
                 ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _originalKeyController,
-                  decoration: const InputDecoration(
-                    labelText: 'Tonalidad Original *',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) {
-                     if (value == null || value.isEmpty) {
-                      return 'Por favor ingresa la tonalidad original';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _tempoController,
-                        decoration: const InputDecoration(
-                          labelText: 'Tempo (BPM)',
-                          border: OutlineInputBorder(),
-                        ),
-                        keyboardType: TextInputType.number,
+              ),
+              SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _originalKeyController,
+                      decoration: InputDecoration(
+                        labelText: 'Tono Original *',
+                        border: OutlineInputBorder(),
+                        hintText: 'Ej: C, G, Am',
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _capoController,
-                        decoration: const InputDecoration(
-                          labelText: 'Capo (Traste)',
-                          border: OutlineInputBorder(),
-                        ),
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                // Selector de Categorías (requiere lógica adicional para selección múltiple)
-                const Text('Categorías:'),
-                FutureBuilder<List<Category>>(
-                  future: Provider.of<CategoryRepository>(context, listen: false).getAllCategories(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const CircularProgressIndicator();
-                    } else if (snapshot.hasError) {
-                      return Text('Error: ${snapshot.error}');
-                    } else {
-                      final categories = snapshot.data ?? [];
-                      return Wrap(
-                        spacing: 8.0,
-                        runSpacing: 4.0,
-                        children: categories.map((category) {
-                          final isSelected = _selectedCategoryIds.contains(category.id);
-                          return ChoiceChip(
-                            label: Text(category.name),
-                            selected: isSelected,
-                            selectedColor: Color(int.tryParse(category.color?.substring(1, 7) ?? '000000', radix: 16) ?? 0xFF000000),
-                            onSelected: (selected) {
-                              setState(() {
-                                if (selected) {
-                                  _selectedCategoryIds.add(category.id!);
-                                } else {
-                                  _selectedCategoryIds.remove(category.id);
-                                }
-                              });
-                            },
-                          );
-                        }).toList(),
-                      );
-                    }
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _contentController,
-                  decoration: const InputDecoration(
-                    labelText: 'Letra con Acordes *',
-                    border: OutlineInputBorder(),
-                    alignLabelWithHint: true,
-                  ),
-                  maxLines: null,
-                  expands: true,
-                  keyboardType: TextInputType.multiline,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Por favor ingresa el contenido de la canción';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _notesController,
-                  decoration: const InputDecoration(
-                    labelText: 'Notas',
-                    border: OutlineInputBorder(),
-                    alignLabelWithHint: true,
-                  ),
-                  maxLines: null,
-                  expands: true,
-                  keyboardType: TextInputType.multiline,
-                ),
-                const SizedBox(height: 16),
-                // Lista de Enlaces de Video
-                const Text('Enlaces de Video:'),
-                ..._videoLinks.map((link) => Card(
-                      child: ListTile(
-                        title: Text(link),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.delete),
-                          onPressed: () {
-                            setState(() {
-                              _videoLinks.remove(link);
-                            });
-                          },
-                        ),
-                      ),
-                    )),
-                // Campo para agregar nuevo enlace de video
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: TextEditingController(text: _tempVideoLink),
-                        decoration: const InputDecoration(
-                          hintText: 'Agregar enlace de video...',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (value) {
-                          setState(() {
-                            _tempVideoLink = value;
-                          });
-                        },
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.add),
-                      onPressed: _tempVideoLink.isEmpty ? null : () {
-                        setState(() {
-                          _videoLinks.add(_tempVideoLink);
-                          _tempVideoLink = '';
-                        });
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'El tono es obligatorio';
+                        }
+                        return null;
                       },
                     ),
-                  ],
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _tempoController,
+                      decoration: InputDecoration(
+                        labelText: 'Tempo (BPM)',
+                        border: OutlineInputBorder(),
+                        hintText: 'Ej: 120',
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _capoController,
+                      decoration: InputDecoration(
+                        labelText: 'Capo',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 20),
+              
+              // Campo de contenido
+              Text(
+                'Contenido',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[700],
+                  fontSize: 14,
                 ),
-              ],
-            ),
+              ),
+              SizedBox(height: 6),
+              TextFormField(
+                controller: _contentController,
+                maxLines: 15,
+                minLines: 10,
+                decoration: InputDecoration(
+                  hintText: 'Ingresa la letra y acordes de la canción...',
+                  border: OutlineInputBorder(),
+                  alignLabelWithHint: true,
+                ),
+              ),
+              SizedBox(height: 16),
+              TextFormField(
+                controller: _notesController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText: 'Notas Adicionales',
+                  hintText: 'Anotaciones sobre la ejecución, estructura, etc.',
+                  border: OutlineInputBorder(),
+                  alignLabelWithHint: true,
+                ),
+              ),
+              SizedBox(height: 16),
+              TextFormField(
+                controller: _videoLinksController,
+                decoration: InputDecoration(
+                  labelText: 'Enlaces de Video',
+                  hintText: 'Separar múltiples enlaces con comas',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+
+              // TODO: Añadir selector de categorías aquí
+              SizedBox(height: 24),
+
+              // Botones de acción
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        side: BorderSide(color: Theme.of(context).primaryColor),
+                      ),
+                      child: Text(
+                        'Cancelar',
+                        style: TextStyle(
+                          color: Theme.of(context).primaryColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _saveSong,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).primaryColor,
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        elevation: 2,
+                      ),
+                      child: Text(
+                        'Guardar',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
