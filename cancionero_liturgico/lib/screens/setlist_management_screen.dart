@@ -21,8 +21,8 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
   final TextEditingController _notesController = TextEditingController();
 
   List<Song> _allSongs = [];
-  List<Song> _selectedSongs = [];
-  List<Song> _filteredSongs = [];
+  List<SetlistItem> _selectedItems = []; // MEJORA: Usar SetlistItem para mantener el orden y la configuración
+  List<Song> _filteredSongs = []; // Para la lista de búsqueda
   String _searchQuery = '';
 
   @override
@@ -35,7 +35,7 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
         _eventDateController.text = widget.setlist!.eventDate!.toString().split(' ').first; // Formato YYYY-MM-DD
       }
       _notesController.text = widget.setlist!.notes ?? '';
-      _selectedSongs = widget.setlist!.songs.map((item) => item.song).toList(); // Cargar canciones iniciales
+      _selectedItems = List.from(widget.setlist!.songs); // Cargar los SetlistItems existentes
     }
     _loadSongs();
   }
@@ -70,16 +70,7 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
       notes: _notesController.text.isNotEmpty ? _notesController.text : null,
       creationDate: widget.setlist?.creationDate ?? DateTime.now(),
       modificationDate: DateTime.now(),
-      songs: _selectedSongs.asMap().entries.map((entry) {
-        final song = entry.value;
-        final order = entry.key + 1; // Orden empieza en 1
-        // Aquí necesitas manejar la transposición y capo personalizados.
-        // Por ahora, se asume valores por defecto o se obtienen de un estado interno si el usuario los ha modificado previamente.
-        // Esto requiere una estructura más compleja para manejar SetlistItem directamente en esta pantalla.
-        // Se simplifica asumiendo que SetlistItem ya tiene los valores correctos o se inicializan aquí.
-        // En una implementación completa, se necesitaría un estado para almacenar SetlistItem con transposición/capo personalizados para cada canción seleccionada.
-        return SetlistItem(song: song, order: order, transposition: 0, capo: null); // Valores por defecto
-      }).toList(),
+      songs: _selectedItems, // MEJORA: Usar la lista de SetlistItem que ya tiene el orden correcto
     );
 
     if (widget.setlist?.id != null) {
@@ -87,7 +78,8 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
     } else {
       await songRepository.insertSetlist(setlist);
     }
-    Navigator.pop(context);
+    // Devolver 'true' para indicar que se guardaron cambios y la lista debe refrescarse.
+    Navigator.pop(context, true);
   }
 
   @override
@@ -157,29 +149,29 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
           Expanded(
             flex: 1,
             child: ReorderableListView.builder(
-              itemCount: _selectedSongs.length,
+              itemCount: _selectedItems.length,
               onReorder: (int oldIndex, int newIndex) {
-                if (oldIndex < newIndex) {
-                  newIndex -= 1;
-                }
-                final item = _selectedSongs.removeAt(oldIndex);
-                _selectedSongs.insert(newIndex, item);
                 setState(() {
-                  // El estado cambia al reordenar la lista
+                  if (oldIndex < newIndex) {
+                    newIndex -= 1;
+                  }
+                  final item = _selectedItems.removeAt(oldIndex);
+                  _selectedItems.insert(newIndex, item);
                 });
               },
               itemBuilder: (context, index) {
-                final song = _selectedSongs[index];
+                final item = _selectedItems[index];
+                final song = item.song;
                 return ListTile(
                   key: ValueKey(song.id),
                   title: Text(song.title),
-                  subtitle: Text('Tono: ${song.originalKey}'), // Mostrar tono original
-                  // Aquí podrías mostrar la transposición/capo personalizado si se manejan en el estado
+                  // MEJORA: Mostrar transposición y capo si son diferentes de los valores por defecto
+                  subtitle: Text('Tono: ${song.originalKey} ${item.transposition != 0 ? '(Transp: ${item.transposition > 0 ? '+' : ''}${item.transposition})' : ''} ${item.capo != null ? '(Capo: ${item.capo})' : ''}'),
                   trailing: IconButton(
                     icon: const Icon(Icons.delete),
                     onPressed: () {
                       setState(() {
-                        _selectedSongs.removeAt(index);
+                        _selectedItems.removeAt(index);
                       });
                     },
                   ),
@@ -213,15 +205,20 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
               itemCount: _filteredSongs.length,
               itemBuilder: (context, index) {
                 final song = _filteredSongs[index];
-                final isSelected = _selectedSongs.any((s) => s.id == song.id);
+                // Aunque una canción puede estar varias veces, aquí solo la marcamos si ya está al menos una vez.
+                final isSelected = _selectedItems.any((item) => item.song.id == song.id);
                 return SongItem(
                   song: song,
                   onTap: () {
-                    if (!isSelected) {
-                      setState(() {
-                        _selectedSongs.add(song);
-                      });
-                    }
+                    // Permitir agregar la misma canción varias veces
+                    setState(() {
+                      _selectedItems.add(SetlistItem(
+                        song: song,
+                        order: _selectedItems.length + 1, // El orden se recalculará al guardar
+                        transposition: 0, // Valor por defecto
+                        capo: null, // Valor por defecto
+                      ));
+                    });
                   },
                   isSelected: isSelected,
                 );

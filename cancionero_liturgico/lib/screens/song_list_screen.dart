@@ -6,13 +6,61 @@ import 'package:cancionero_liturgico/services/song_repository.dart';
 import 'package:cancionero_liturgico/screens/song_detail_screen.dart';
 import 'package:cancionero_liturgico/screens/song_edit_screen.dart';
 import 'package:cancionero_liturgico/widgets/song_item.dart';
+import 'package:cancionero_liturgico/screens/setlist_management_screen.dart'; // Importar la pantalla de gestión de setlists
 import 'package:cancionero_liturgico/widgets/song_search_delegate.dart';
 import 'package:cancionero_liturgico/services/category_repository.dart'; // Añadir esta línea
 
-class SongListScreen extends StatelessWidget {
+class SongListScreen extends StatefulWidget {
   final int? categoryId; // Si es null, mostrar todas las canciones o aplicar filtros
 
   const SongListScreen({super.key, this.categoryId});
+
+  @override
+  State<SongListScreen> createState() => _SongListScreenState();
+}
+
+class _SongListScreenState extends State<SongListScreen> {
+  late Future<List<Song>> _songsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSongs();
+  }
+
+  void _loadSongs() {
+    final songRepository = Provider.of<SongRepository>(context, listen: false);
+    setState(() {
+      _songsFuture = widget.categoryId != null
+          ? songRepository.getSongsByCategory(widget.categoryId!)
+          : songRepository.getAllSongs();
+    });
+  }
+
+  // MEJORA: Método para navegar y esperar resultado para refrescar la lista
+  Future<void> _navigateAndRefreshSongs(Widget screen) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => screen),
+    );
+    // Al volver, recargar la lista de canciones.
+    // El 'result' podría usarse si la pantalla de edición devolviera un valor.
+    _loadSongs();
+  }
+
+  // Lógica similar para la gestión de setlists.
+  // NOTA: Este es un ejemplo de cómo se implementaría en la pantalla de lista de setlists.
+  Future<void> _navigateAndRefreshSetlists(Widget screen) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => screen),
+    );
+
+    // Si la pantalla de gestión devuelve 'true', significa que se guardó algo.
+    if (result == true) {
+    _loadSongs();
+    }
+  } // Fin del método _navigateAndRefreshSetlists
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +69,7 @@ class SongListScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(categoryId != null ? 'Canciones' : 'Todas las Canciones'),
+        title: Text(widget.categoryId != null ? 'Canciones' : 'Todas las Canciones'),
         actions: [
           // MEJORA: Usar SearchDelegate para una mejor experiencia de búsqueda
           IconButton(
@@ -35,25 +83,21 @@ class SongListScreen extends StatelessWidget {
 
               if (selectedSong != null && context.mounted) {
                 Provider.of<SongProvider>(context, listen: false).setSelectedSong(selectedSong);
-                Navigator.push(context, MaterialPageRoute(builder: (context) => SongDetailScreen(song: selectedSong)));
+                // Usamos el nuevo método para que si hay cambios (ej. favoritos) se reflejen
+                _navigateAndRefreshSongs(SongDetailScreen(song: selectedSong));
               }
             },
           ),
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SongEditScreen()),
-              );
+              _navigateAndRefreshSongs(const SongEditScreen());
             },
           ),
         ],
       ),
       body: FutureBuilder<List<Song>>(
-              future: categoryId != null
-                  ? songRepository.getSongsByCategory(categoryId!)
-                  : songRepository.getAllSongs(), // Por ahora, sin filtro de búsqueda activo
+              future: _songsFuture,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
@@ -75,22 +119,12 @@ class SongListScreen extends StatelessWidget {
                           onTap: () {
                             // **LA CORRECCIÓN: Establecer la canción seleccionada en el provider**
                             Provider.of<SongProvider>(context, listen: false).setSelectedSong(song);
-
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => SongDetailScreen(song: song),
-                              ),
-                            );
+                            _navigateAndRefreshSongs(SongDetailScreen(song: song));
                           },
                           onLongPress: () {
                             // Opción de edición en presión larga
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => SongEditScreen(song: song),
-                              ),
-                            );
+                            // MEJORA: Usar el método que refresca la lista al volver
+                            _navigateAndRefreshSongs(SongEditScreen(song: song));
                           },
                         ),
                       );
