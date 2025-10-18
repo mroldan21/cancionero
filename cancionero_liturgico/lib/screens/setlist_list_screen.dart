@@ -68,14 +68,12 @@ class _SetlistListScreenState extends State<SetlistListScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (setlist.songs.isNotEmpty) // Solo mostrar el botón si hay canciones
-                        IconButton(
-                          icon: const Icon(Icons.play_arrow),
-                          tooltip: 'Reproducir Setlist',
+                        ElevatedButton(
                           onPressed: () {
                             final songProvider = Provider.of<SongProvider>(context, listen: false);
                             // Establecer la primera canción del setlist como la activa
                             songProvider.setSelectedSetlistItem(setlist.songs.first, 0);
-                            
+
                             // Navegar a la pantalla de detalle, que actuará como modo presentación
                             Navigator.push(
                               context,
@@ -84,7 +82,15 @@ class _SetlistListScreenState extends State<SetlistListScreen> {
                               ),
                             );
                           },
+                          style: ElevatedButton.styleFrom(
+                            shape: const CircleBorder(),
+                            padding: const EdgeInsets.all(8),
+                            backgroundColor: Theme.of(context).colorScheme.primary,
+                            foregroundColor: Theme.of(context).colorScheme.onPrimary,
+                          ),
+                          child: const Icon(Icons.play_arrow, size: 24),
                         ),
+                      const SizedBox(width: 8), // Espacio entre el botón de play y el de editar
                       const Icon(Icons.chevron_right), // Icono para editar
                     ],
                   ),

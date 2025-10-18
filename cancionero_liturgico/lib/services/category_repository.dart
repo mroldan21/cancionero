@@ -83,7 +83,6 @@ class CategoryRepository {
     return false; // Si no existe, no es predefinida
   }
 
-  // Nuevo método para contar canciones asociadas a una categoría
   Future<int> getSongCountForCategory(int categoryId) async {
     final db = await _databaseHelper.database;
     final result = await db.rawQuery('''
@@ -93,5 +92,15 @@ class CategoryRepository {
     ''', [categoryId]);
     final count = result.first['count'] as int;
     return count;
+  }
+
+  Future<void> updateCategoryOrder(List<Category> categories) async {
+    final db = await _databaseHelper.database;
+    final batch = db.batch();
+    for (var i = 0; i < categories.length; i++) {
+      final category = categories[i];
+      batch.update('categories', {'orden': i}, where: 'id = ?', whereArgs: [category.id]);
+    }
+    await batch.commit(noResult: true);
   }
 }
