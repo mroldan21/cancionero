@@ -292,7 +292,8 @@ class SongRepository {
 
   Future<void> toggleFavorite(int songId) async {
     final db = await _databaseHelper.database;
-    // SOLUCIÓN: Usar una única consulta atómica para invertir el estado de favorito.
+    // SOLUCIÓN: Usar una única consulta atómica para invertir el estado de favorito
+    // y actualizar la fecha de modificación.
     await db.rawUpdate('''
       UPDATE songs 
       SET es_favorita = CASE WHEN es_favorita = 1 THEN 0 ELSE 1 END,

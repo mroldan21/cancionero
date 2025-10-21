@@ -1,11 +1,39 @@
 import 'package:flutter/foundation.dart';
 import 'package:cancionero_liturgico/models/song.dart';
 import 'package:cancionero_liturgico/models/setlist.dart'; // Importa SetlistItem
+import 'package:cancionero_liturgico/services/song_repository.dart'; // Import SongRepository
 
 class SongProvider with ChangeNotifier {
   Song? _selectedSong;
   SetlistItem? _selectedSetlistItem; // Nuevo: para manejar canción con config específica en setlist
   int _currentSetlistIndex = -1; // Nuevo: índice de la canción actual en el setlist
+
+  // SOLUCIÓN: Añadir una lista maestra de todas las canciones.
+  List<Song> _songs = [];
+  // SOLUCIÓN: Añadir un indicador de carga para la lista maestra.
+  bool _isLoadingSongs = false;
+
+  // SOLUCIÓN: Getter para la lista maestra de canciones.
+  List<Song> get songs => _songs;
+  // SOLUCIÓN: Getter para las canciones favoritas de la lista maestra.
+  List<Song> get favoriteSongs => _songs.where((song) => song.isFavorite).toList();
+  // SOLUCIÓN: Getter para el estado de carga.
+  bool get isLoadingSongs => _isLoadingSongs;
+
+  // SOLUCIÓN: Método para cargar todas las canciones en el provider.
+  Future<void> loadSongs(SongRepository repository) async {
+    if (_isLoadingSongs) return; // Evitar cargas simultáneas.
+    _isLoadingSongs = true;
+    notifyListeners(); // Notificar que la carga ha comenzado.
+    try {
+      _songs = await repository.getAllSongs();
+    } catch (e) {
+      print("Error al cargar canciones en SongProvider: $e");
+    } finally {
+      _isLoadingSongs = false;
+      notifyListeners(); // Notificar que la carga ha terminado y la lista está actualizada.
+    }
+  }
 
   // Getters para la canción actualmente mostrada/activa
   Song? get currentSong {
@@ -63,6 +91,7 @@ class SongProvider with ChangeNotifier {
   // int get currentSetlistTotal => _currentSetlist?.songs.length ?? 0;
 
   // Métodos para seleccionar una canción individual
+  // SOLUCIÓN: Modificado para también actualizar la canción en la lista maestra si existe.
   void setSelectedSong(Song? song) {
     // Optimización: No notificar si la canción seleccionada es la misma.
     if (_selectedSong == song) return;
@@ -70,7 +99,24 @@ class SongProvider with ChangeNotifier {
     _selectedSong = song;
     _selectedSetlistItem = null; // Limpiar selección de setlist
     _currentSetlistIndex = -1; // Reiniciar índice
+
+    // SOLUCIÓN: Si la canción seleccionada es una actualización de una canción en la lista maestra,
+    // actualizarla también en la lista maestra para mantener la consistencia.
+    if (song != null && song.id != null) {
+      updateSongInList(song); // Reutilizar el método de actualización de lista.
+    }
     notifyListeners();
+  }
+
+  // SOLUCIÓN: Nuevo método para actualizar una canción específica en la lista maestra.
+  void updateSongInList(Song updatedSong) {
+    final index = _songs.indexWhere((song) => song.id == updatedSong.id);
+    if (index != -1) {
+      _songs[index] = updatedSong;
+      notifyListeners(); // Notificar a los oyentes (SongListScreen, FavoritesScreen)
+    }
+    // Si la canción actualizada es la actualmente seleccionada, también actualizar _selectedSong
+    if (_selectedSong?.id == updatedSong.id) _selectedSong = updatedSong;
   }
 
   void clearSelectedSong() {
@@ -80,6 +126,16 @@ class SongProvider with ChangeNotifier {
     _selectedSong = null;
     _selectedSetlistItem = null;
     _currentSetlistIndex = -1;
+    notifyListeners();
+  }
+
+  // SOLUCIÓN: Nuevo método para obtener una canción por ID de la lista maestra.
+  Song? getSongById(int songId) {
+    try {
+      return _songs.firstWhere((song) => song.id == songId);
+    } catch (e) {
+      return null;
+    }
     notifyListeners();
   }
 

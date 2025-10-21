@@ -58,19 +58,29 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
     final songRepository = Provider.of<SongRepository>(context, listen: false);
     final songProvider = Provider.of<SongProvider>(context, listen: false);
 
-    // Determinar el nuevo estado de favorito
-    final newFavoriteState = !currentSong.isFavorite;
+    try {
+      // Determinar el nuevo estado de favorito
+      final newFavoriteState = !currentSong.isFavorite;
 
-    // 1. Actualizar la base de datos de forma atómica.
-    await songRepository.toggleFavorite(currentSong.id!);
+      // 1. Primero actualizar BD
+      await songRepository.toggleFavorite(currentSong.id!);
 
-    // 2. Crear una nueva instancia de la canción con el estado ya actualizado.
-    final updatedSongInUI = currentSong.copyWith(isFavorite: newFavoriteState);
+      // 2. Luego crear una nueva instancia de la canción con el estado ya actualizado.
+      final updatedSong = currentSong.copyWith(isFavorite: newFavoriteState);
 
-    // 3. Actualizar el provider para que la UI reaccione inmediatamente.
-    songProvider.setSelectedSong(updatedSongInUI);
-    // Marcar que ha habido cambios.
-    _hasChanges = true;
+      // 3. Actualizar la canción en la lista maestra del provider.
+      songProvider.updateSongInList(updatedSong);
+      // 4. Actualizar la canción seleccionada en el provider (para esta pantalla).
+      songProvider.setSelectedSong(updatedSong);
+      
+      _hasChanges = true;
+      
+    } catch (e) {
+      // Si falla la BD, mostramos error y NO actualizamos UI
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al actualizar favorito: $e')),
+      );
+    }
   }
 
   @override
@@ -84,11 +94,12 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
     final songRepository = Provider.of<SongRepository>(context, listen: false); // No necesita escuchar
 
     // SOLUCIÓN: Determinar la fuente de verdad para la canción a mostrar.
+    // Priorizar la canción del provider si está en modo setlist o si es la misma canción.
     Song currentSong;
     if (isSetlistMode && songProvider.currentSong != null) {
       // Si estamos en modo setlist, la canción actual SIEMPRE es la del provider.
       currentSong = songProvider.currentSong!;
-    } else if (songProvider.currentSong != null && songProvider.currentSong!.id == widget.song.id) {
+    } else if (songProvider.currentSong != null && songProvider.currentSong!.id == widget.song.id) { // Si es la misma canción, usar la del provider
       // Si no es modo setlist (o el provider aún no se actualizó), pero hay una canción en el provider
       // que coincide con la del widget, la usamos para reflejar cambios (ej: al volver de editar).
       currentSong = songProvider.currentSong!;
@@ -160,13 +171,12 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
                   context,
                   MaterialPageRoute(builder: (context) => SongEditScreen(song: currentSong)),
                 ).then((result) async {
-                  // Si la edición fue exitosa (result == true)
-                  if (result == true && currentSong.id != null) {
-                    // Recargar la canción desde la base de datos
-                    final updatedSong = await songRepository.getSongById(currentSong.id!);
-                    if (updatedSong != null) {
-                      // Actualizar el provider para que la UI reaccione.
-                    Provider.of<SongProvider>(context, listen: false).setSelectedSong(updatedSong);
+                  // Si la edición fue exitosa (result == true), recargar la canción en el provider.
+                  if (result == true) {
+                    final updatedSongFromDb = await songRepository.getSongById(currentSong.id!);
+                    if (updatedSongFromDb != null) {
+                      songProvider.updateSongInList(updatedSongFromDb); // Actualizar la lista maestra
+                      songProvider.setSelectedSong(updatedSongFromDb); // Actualizar la canción seleccionada
                     }
                   }
                 });

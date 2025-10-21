@@ -20,20 +20,16 @@ class SongListScreen extends StatefulWidget {
 }
 
 class _SongListScreenState extends State<SongListScreen> {
-  // SOLUCIÓN: Usar una key para forzar la reconstrucción del FutureBuilder
-  int _futureBuilderKey = 0;
-
   @override
   void initState() {
     super.initState();
+    // SOLUCIÓN: Cargar las canciones en el SongProvider al inicializar la pantalla.
+    // Esto asegura que el provider tenga la lista maestra.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<SongProvider>(context, listen: false).loadSongs(Provider.of<SongRepository>(context, listen: false));
+    });
   }
-
-  void _loadSongs() {
-    // SOLUCIÓN: Simplemente incrementamos la key. Esto hará que el FutureBuilder
-    // se reconstruya y vuelva a llamar a su `future`.
-    setState(() => _futureBuilderKey++);
-  }
-
+  
   // MEJORA: Método para navegar y esperar resultado para refrescar la lista
   Future<void> _navigateAndRefreshSongs(Widget screen) async {
     final result = await Navigator.push(
@@ -41,8 +37,10 @@ class _SongListScreenState extends State<SongListScreen> {
       MaterialPageRoute(builder: (context) => screen),
     );
     // Al volver, recargar la lista de canciones.
-    // El 'result' podría usarse si la pantalla de edición devolviera un valor.
-    _loadSongs();
+    // Si se añadió/editó/eliminó una canción, recargar la lista maestra en el provider.
+    if (result == true) {
+      Provider.of<SongProvider>(context, listen: false).loadSongs(Provider.of<SongRepository>(context, listen: false));
+    }
   }
 
   // Lógica similar para la gestión de setlists.
@@ -55,13 +53,14 @@ class _SongListScreenState extends State<SongListScreen> {
 
     // Si la pantalla de gestión devuelve 'true', significa que se guardó algo.
     if (result == true) {
-    _loadSongs();
+      Provider.of<SongProvider>(context, listen: false).loadSongs(Provider.of<SongRepository>(context, listen: false));
     }
   } // Fin del método _navigateAndRefreshSetlists
 
   @override
   Widget build(BuildContext context) {
     print("[SCREEN] Build: SongListScreen");
+    // Escuchar al SongProvider para obtener la lista de canciones y reaccionar a cambios.
     final songRepository = Provider.of<SongRepository>(context, listen: false);
 
     return Scaffold(
@@ -94,41 +93,38 @@ class _SongListScreenState extends State<SongListScreen> {
           ),
         ],
       ),
-      body: FutureBuilder<List<Song>>(
-              // SOLUCIÓN: Usar la key y definir el future directamente aquí.
-              key: ValueKey(_futureBuilderKey),
-              future: widget.categoryId != null
-                  ? songRepository.getSongsByCategory(widget.categoryId!)
-                  : songRepository.getAllSongs(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                } else if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                } else {
-                  final songs = snapshot.data ?? [];
-                  return ListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: 8.0),
-                    itemCount: songs.length,
-                    itemBuilder: (context, index) {
-                      return SongItem(
-                        song: songs[index],
-                        onTap: () {
-                          // SOLUCIÓN: No es necesario establecer la canción en el provider aquí.
-                          // SongDetailScreen la recibirá a través del constructor (widget.song).
-                          // Y usamos el método que refresca la lista al volver.
-                          _navigateAndRefreshSongs(SongDetailScreen(song: songs[index]));
-                        },
-                        // El onLongPress se puede añadir aquí si se desea
-                        onLongPress: () {
-                          _navigateAndRefreshSongs(SongEditScreen(song: songs[index]));
-                        },
-                      );
-                    },
-                  );
-                }
-              },
-            ),
+      body: Consumer<SongProvider>(
+        builder: (context, songProvider, child) {
+          if (songProvider.isLoadingSongs) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final songs = widget.categoryId != null
+              ? songProvider.songs.where((s) => s.categoryIds.contains(widget.categoryId)).toList()
+              : songProvider.songs;
+
+          if (songs.isEmpty) {
+            return const Center(child: Text('No hay canciones disponibles.'));
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.symmetric(vertical: 8.0),
+            itemCount: songs.length,
+            itemBuilder: (context, index) {
+              return SongItem(
+                song: songs[index],
+                onTap: () {
+                  songProvider.setSelectedSong(songs[index]);
+                  _navigateAndRefreshSongs(SongDetailScreen(song: songs[index]));
+                },
+                onLongPress: () {
+                  _navigateAndRefreshSongs(SongEditScreen(song: songs[index]));
+                },
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

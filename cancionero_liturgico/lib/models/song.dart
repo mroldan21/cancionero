@@ -13,6 +13,7 @@ class Song {
   final String? notes;
   final List<String>? videoLinks;
   final double? preferredFontSize;
+  final List<int> categoryIds; // Nuevo campo para almacenar los IDs de las categorías
 
   Song({
     this.id,
@@ -29,6 +30,7 @@ class Song {
     this.notes,
     this.videoLinks,
     this.preferredFontSize,
+    this.categoryIds = const [], // Valor por defecto
   });
 
   factory Song.fromMap(Map<String, dynamic> map) {
@@ -47,6 +49,13 @@ class Song {
       notes: map['notas'],
       videoLinks: (map['enlaces_video'] as String?)?.split(',').where((s) => s.trim().isNotEmpty).toList(),
       preferredFontSize: map['preferred_font_size'],
+      // SOLUCIÓN: Parsear los IDs de las categorías desde la cadena GROUP_CONCAT
+      categoryIds: (map['categoria_ids'] as String?)
+              ?.split(',')
+              .where((id) => id.isNotEmpty)
+              .map((id) => int.parse(id))
+              .toList() ??
+          [],
     );
   }
 
@@ -66,6 +75,7 @@ class Song {
       'notas': notes,
       'enlaces_video': videoLinks?.join(','),
       'preferred_font_size': preferredFontSize,
+      // 'category_ids' no se mapea a la BD directamente, se gestiona en la tabla cancion_categoria
     };
   }
 
@@ -84,6 +94,7 @@ class Song {
     String? notes,
     List<String>? videoLinks,
     double? preferredFontSize,
+    List<int>? categoryIds,
   }) {
     return Song(
       id: id ?? this.id,
@@ -100,6 +111,7 @@ class Song {
       notes: notes ?? this.notes,
       videoLinks: videoLinks ?? this.videoLinks,
       preferredFontSize: preferredFontSize ?? this.preferredFontSize,
+      categoryIds: categoryIds ?? this.categoryIds,
     );
   }
 }

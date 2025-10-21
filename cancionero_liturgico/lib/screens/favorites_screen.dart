@@ -7,69 +7,52 @@ import 'package:cancionero_liturgico/widgets/song_item.dart';
 import 'package:cancionero_liturgico/services/song_provider.dart';
 
 class FavoritesScreen extends StatefulWidget {
-  const FavoritesScreen({super.key});
+  const FavoritesScreen({Key? key}) : super(key: key);
 
   @override
   State<FavoritesScreen> createState() => _FavoritesScreenState();
 }
 
 class _FavoritesScreenState extends State<FavoritesScreen> {
-  late Future<List<Song>> _favoritesFuture;
-
   @override
   void initState() {
     super.initState();
-    _loadFavorites();
-  }
-
-  void _loadFavorites() {
-    setState(() {
-      _favoritesFuture = Provider.of<SongRepository>(context, listen: false).getFavoriteSongs();
+    // SOLUCIÓN: Cargar las canciones en el SongProvider al inicializar la pantalla.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<SongProvider>(context, listen: false).loadSongs(Provider.of<SongRepository>(context, listen: false));
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    // Escuchar al SongProvider para obtener la lista de canciones favoritas y reaccionar a cambios.
+    final songProvider = Provider.of<SongProvider>(context, listen: true);
+    final List<Song> favoriteSongs = songProvider.favoriteSongs;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Canciones más frecuentes')),
-      body: FutureBuilder<List<Song>>(
-        future: _favoritesFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+      body: Consumer<SongProvider>(
+        builder: (context, songProvider, child) {
+          if (songProvider.isLoadingSongs) {
             return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else {
-            final songs = snapshot.data ?? [];
-            if (songs.isEmpty) {
-              return const Center(child: Text('No hay canciones favoritas.'));
-            }
-            return ListView.builder(
-              itemCount: songs.length,
-              itemBuilder: (context, index) {
-                final song = songs[index];
-                return SongItem(
-                  song: song,
-                  onTap: () {
-                    // Limpiar el estado anterior antes de navegar
-                    Provider.of<SongProvider>(context, listen: false).clearSelectedSong();
-                    // Navegar y esperar un resultado booleano
-                    Navigator.push<bool>(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => SongDetailScreen(song: song),
-                      ),
-                    ).then((result) {
-                      // Si la pantalla anterior devolvió 'true', recargar la lista.
-                      if (result == true) {
-                        _loadFavorites();
-                      }
-                    });
-                  },
-                );
-              },
-            );
           }
+          final favoriteSongs = songProvider.favoriteSongs;
+          if (favoriteSongs.isEmpty) {
+            return const Center(child: Text('No hay canciones favoritas.'));
+          }
+          return ListView.builder(
+            itemCount: favoriteSongs.length,
+            itemBuilder: (context, index) {
+              final song = favoriteSongs[index];
+              return SongItem(
+                song: song,
+                onTap: () {
+                  songProvider.setSelectedSong(song);
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => SongDetailScreen(song: song)));
+                },
+              );
+            },
+          );
         },
       ),
     );
