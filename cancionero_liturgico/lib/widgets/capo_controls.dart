@@ -86,6 +86,7 @@ class CapoControls extends StatelessWidget {
                         modificationDate: song.modificationDate, // Campo requerido
                         notes: song.notes,
                         videoLinks: song.videoLinks,
+                        preferredFontSize: song.preferredFontSize, // Preservar el tamaño de fuente existente
                         // No usar 'category' porque no existe en el modelo Song
                       ),
                     );

@@ -19,7 +19,7 @@ class DatabaseHelper {
     String path = join(await getDatabasesPath(), 'cancionero.db');
     return await openDatabase(
       path,
-      version: 7, // SOLICITUD: Incrementar versión para añadir categoría y setlist de ejemplo
+      version: 8, // SOLICITUD: Incrementar versión para añadir categoría y setlist de ejemplo
       onCreate: _onCreate,
       onUpgrade: _onUpgrade, // Añadir callback de actualización
     );
@@ -77,6 +77,25 @@ class DatabaseHelper {
 
     // Tabla de Canciones
     await db.execute('''
+      CREATE TABLE songs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        titulo TEXT NOT NULL,
+        autor TEXT,
+        letra_con_acordes TEXT NOT NULL,
+        tonalidad_original TEXT NOT NULL,
+        tempo_bpm INTEGER, -- Puede ser nulo
+        posicion_capo INTEGER DEFAULT 0,
+        es_favorita INTEGER DEFAULT 0, -- BOOLEANO (0=false, 1=true)
+        preferred_font_size REAL DEFAULT 16.0, -- Nuevo campo para el tamaño de fuente con valor por defecto
+        contador_reproducciones INTEGER DEFAULT 0,
+        fecha_creacion TEXT NOT NULL, -- Almacenar como TEXT en formato ISO
+        fecha_modificacion TEXT NOT NULL, -- Almacenar como TEXT en formato ISO
+        notas TEXT,
+        enlaces_video TEXT -- Almacenar como CSV o JSON en un STRING
+      )
+    ''');
+    print("[DEBUG] _createTables: Executing CREATE TABLE songs with schema:");
+    print('''
       CREATE TABLE songs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         titulo TEXT NOT NULL,
@@ -293,6 +312,7 @@ class DatabaseHelper {
     // 2. Iterar sobre las canciones de ejemplo
     for (var songData in exampleSongs) {
       // 3. Insertar la canción
+      print("[DEBUG] _insertExampleSongs: Processing song '${songData['titulo']}'. preferred_font_size in map: ${songData['preferred_font_size']}");
       // Asegurar casts explícitos para campos requeridos y manejar campos opcionales
       final songId = await db.insert('songs', {
         'titulo': songData['titulo'] as String, // Cast explícito

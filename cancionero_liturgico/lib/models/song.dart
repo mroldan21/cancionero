@@ -99,9 +99,7 @@ class Song {
       modificationDate: modificationDate ?? this.modificationDate,
       notes: notes ?? this.notes,
       videoLinks: videoLinks ?? this.videoLinks,
-      // SOLUCIÓN: Usar el nuevo valor si se proporciona, incluso si es null.
-      // Para eso, necesitamos una forma de saber si el parámetro fue pasado.
-      preferredFontSize: preferredFontSize,
+      preferredFontSize: preferredFontSize ?? this.preferredFontSize,
     );
   }
 }
