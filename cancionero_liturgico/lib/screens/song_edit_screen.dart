@@ -18,19 +18,20 @@ class SongEditScreen extends StatefulWidget {
 
 class _SongEditScreenState extends State<SongEditScreen> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _titleController;
-  late TextEditingController _authorController;
-  late TextEditingController _originalKeyController;
-  late TextEditingController _tempoController;
-  late TextEditingController _capoController;
-  late TextEditingController _contentController;
-  late TextEditingController _notesController;
-  late TextEditingController _videoLinksController;
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _authorController = TextEditingController();
+  final TextEditingController _originalKeyController = TextEditingController();
+  final TextEditingController _tempoController = TextEditingController();
+  final TextEditingController _capoController = TextEditingController();
+  final TextEditingController _contentController = TextEditingController();
+  final TextEditingController _notesController = TextEditingController();
+  final TextEditingController _videoLinksController = TextEditingController();
   
   // Nuevas variables de estado para las categorías
   List<Category> _allCategories = [];
   Set<int> _selectedCategoryIds = {};
   bool _isLoadingCategories = true;
+  double _previewFontSize = 16.0; // Estado para el tamaño de fuente de la vista previa
 
   @override
   void initState() {
@@ -49,20 +50,39 @@ class _SongEditScreenState extends State<SongEditScreen> {
 
     if (!mounted) return;
 
+    // SOLICITUD: Imprimir todos los parámetros de la canción para depuración.
+    if (widget.song != null) {
+      print("""
+[DEBUG] SongEditScreen _loadInitialData:
+  - Song ID: ${widget.song!.id}
+  - Title: ${widget.song!.title}
+  - Author: ${widget.song!.author}
+  - Original Key: ${widget.song!.originalKey}
+  - Tempo: ${widget.song!.tempoBpm}
+  - Capo: ${widget.song!.capoPosition}
+  - Favorite: ${widget.song!.isFavorite}
+  - Play Count: ${widget.song!.playCount}
+  - Creation Date: ${widget.song!.creationDate.toIso8601String()}
+  - Modification Date: ${widget.song!.modificationDate.toIso8601String()}
+  - preferredFontSize: ${widget.song!.preferredFontSize}
+"""); // Fin del print de depuración
+    }
+
     // Si estamos editando, rellenar los campos. Si no, se quedan vacíos.
-    _titleController = TextEditingController(text: widget.song?.title ?? '');
-    _authorController = TextEditingController(text: widget.song?.author ?? '');
-    _originalKeyController = TextEditingController(text: widget.song?.originalKey ?? '');
-    _tempoController = TextEditingController(text: widget.song?.tempoBpm?.toString() ?? '');
-    _capoController = TextEditingController(text: widget.song?.capoPosition?.toString() ?? '0');
-    _contentController = TextEditingController(text: widget.song?.content ?? '');
-    _notesController = TextEditingController(text: widget.song?.notes ?? '');
-    _videoLinksController = TextEditingController(text: widget.song?.videoLinks?.join(', ') ?? '');
+    _titleController.text = widget.song?.title ?? '';
+    _authorController.text = widget.song?.author ?? '';
+    _originalKeyController.text = widget.song?.originalKey ?? '';
+    _tempoController.text = widget.song?.tempoBpm?.toString() ?? '';
+    _capoController.text = widget.song?.capoPosition?.toString() ?? '0';
+    _contentController.text = widget.song?.content ?? '';
+    _notesController.text = widget.song?.notes ?? '';
+    _videoLinksController.text = widget.song?.videoLinks?.join(', ') ?? '';
 
     setState(() {
       _allCategories = categories;
       _selectedCategoryIds = Set.from(songCategoryIds);
       _isLoadingCategories = false;
+      _previewFontSize = widget.song?.preferredFontSize ?? 16.0; // Cargar tamaño de fuente guardado o default
     });
   }
 
@@ -101,7 +121,7 @@ class _SongEditScreenState extends State<SongEditScreen> {
           isFavorite: widget.song?.isFavorite ?? false, // El favorito se cambia en la vista de detalle
           playCount: widget.song?.playCount ?? 0,
           creationDate: widget.song?.creationDate ?? DateTime.now(),
-          preferredFontSize: widget.song?.preferredFontSize, // SOLUCIÓN: Preservar el valor existente
+          preferredFontSize: _previewFontSize, // Guardar el tamaño de fuente ajustado
           modificationDate: DateTime.now(),
         );
 
@@ -128,6 +148,7 @@ class _SongEditScreenState extends State<SongEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print("[SCREEN] Build: SongEditScreen");
     return Scaffold(
       appBar: AppBar(
         title: Text( // El título cambia si estamos creando o editando
@@ -222,6 +243,29 @@ class _SongEditScreenState extends State<SongEditScreen> {
                 ],
               ),
               SizedBox(height: 20),
+
+              // SOLICITUD: Control para el tamaño de fuente con vista previa en tiempo real
+              Text(
+                'Tamaño de Fuente para Presentación (${_previewFontSize.toStringAsFixed(0)} pt)',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[700],
+                  fontSize: 14,
+                ),
+              ),
+              Slider(
+                value: _previewFontSize,
+                min: 12.0,
+                max: 40.0,
+                divisions: 28, // (40-12)
+                label: _previewFontSize.toStringAsFixed(0),
+                onChanged: (value) {
+                  setState(() {
+                    _previewFontSize = value;
+                  });
+                },
+              ),
+              SizedBox(height: 10),
               
               // Campo de contenido
               Text(
@@ -237,6 +281,7 @@ class _SongEditScreenState extends State<SongEditScreen> {
                 controller: _contentController,
                 maxLines: 15,
                 minLines: 10,
+                style: TextStyle(fontSize: _previewFontSize), // Vista previa en tiempo real
                 decoration: InputDecoration(
                   hintText: 'Ingresa la letra y acordes de la canción...',
                   border: OutlineInputBorder(),

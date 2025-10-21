@@ -11,6 +11,7 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print("[SCREEN] Build: SettingsScreen");
     final themeProvider = Provider.of<ThemeProvider>(context);
 
     return Scaffold(

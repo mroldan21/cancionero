@@ -40,6 +40,7 @@ class _SetlistListScreenState extends State<SetlistListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print("[SCREEN] Build: SetlistListScreen");
     return Scaffold(
       appBar: AppBar(title: const Text('Setlists')),
       body: FutureBuilder<List<Setlist>>(
@@ -55,6 +56,17 @@ class _SetlistListScreenState extends State<SetlistListScreen> {
               itemCount: setlists.length,
               itemBuilder: (context, index) {
                 final setlist = setlists[index];
+                // SOLICITUD: Imprimir todos los parámetros del setlist para depuración.
+                print("""
+[DEBUG] SetlistListScreen build item:
+  - Setlist ID: ${setlist.id}
+  - Name: ${setlist.name}
+  - Event Date: ${setlist.eventDate?.toIso8601String()}
+  - Notes: ${setlist.notes}
+  - Song Count: ${setlist.songs.length}
+  - Creation Date: ${setlist.creationDate.toIso8601String()}
+  - Modification Date: ${setlist.modificationDate.toIso8601String()}
+"""); // Fin del print de depuración
                 return ListTile(
                   title: Text(setlist.name),
                   subtitle: Column(

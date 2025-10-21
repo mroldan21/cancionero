@@ -84,6 +84,7 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print("[SCREEN] Build: SetlistManagementScreen");
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.setlist != null ? 'Editar Setlist' : 'Nuevo Setlist'),

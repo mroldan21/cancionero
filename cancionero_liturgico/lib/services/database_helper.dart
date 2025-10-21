@@ -19,7 +19,7 @@ class DatabaseHelper {
     String path = join(await getDatabasesPath(), 'cancionero.db');
     return await openDatabase(
       path,
-      version: 4, // Incrementar versión para añadir preferred_font_size
+      version: 7, // SOLICITUD: Incrementar versión para añadir categoría y setlist de ejemplo
       onCreate: _onCreate,
       onUpgrade: _onUpgrade, // Añadir callback de actualización
     );
@@ -85,8 +85,8 @@ class DatabaseHelper {
         tonalidad_original TEXT NOT NULL,
         tempo_bpm INTEGER, -- Puede ser nulo
         posicion_capo INTEGER DEFAULT 0,
-        es_favorita INTEGER DEFAULT 0, -- BOOLEANO
-        preferred_font_size REAL, -- Nuevo campo para el tamaño de fuente
+        es_favorita INTEGER DEFAULT 0, -- BOOLEANO (0=false, 1=true)
+        preferred_font_size REAL DEFAULT 16.0, -- Nuevo campo para el tamaño de fuente con valor por defecto
         contador_reproducciones INTEGER DEFAULT 0,
         fecha_creacion TEXT NOT NULL, -- Almacenar como TEXT en formato ISO
         fecha_modificacion TEXT NOT NULL, -- Almacenar como TEXT en formato ISO
@@ -174,11 +174,14 @@ class DatabaseHelper {
     final songCount = Sqflite.firstIntValue(songCountResult) ?? 0;
 
     if (songCount == 0) {
-      await _insertExampleSongs(db);
+      // Insertar canciones y obtener el mapa de títulos a IDs en una sola llamada
+      final songIdMap = await _insertExampleSongs(db);
+      await _insertExampleSetlists(db, songIdMap);
     } else {
       print("[DB] _insertSeedData: Canciones ya existen ($songCount), omitiendo inserción.");
     }
   }
+
 
   // Función auxiliar para insertar categorías predefinidas
   Future<void> _insertPredefinedCategories(Database db) async {
@@ -193,6 +196,7 @@ class DatabaseHelper {
       {'nombre': 'Adoración', 'color': '#FF5722', 'orden': 7},
       {'nombre': 'Penitencial', 'color': '#795548', 'orden': 8},
       {'nombre': 'Aleluya', 'color': '#FFEB3B', 'orden': 9},
+      {'nombre': 'Canciones Mías', 'color': '#607D8B', 'orden': 10, 'es_predefinida': 0}, // SOLICITUD: Categoría personalizada
     ];
 
     for (var catData in predefinedCategories) {
@@ -200,7 +204,7 @@ class DatabaseHelper {
         'nombre': catData['nombre'],
         'color': catData['color'],
         'orden': catData['orden'],
-        'es_predefinida': 1, // Marcado como predefinido
+        'es_predefinida': catData['es_predefinida'] ?? 1, // Usar el valor del mapa o 1 por defecto
       });
     }
     print("[DB] _insertPredefinedCategories: ${predefinedCategories.length} categorías insertadas.");
@@ -208,8 +212,8 @@ class DatabaseHelper {
 
   
   // Función auxiliar para insertar canciones de ejemplo
-  // lib/services/database_helper.dart
-  Future<void> _insertExampleSongs(Database db) async {
+  // Modificado para devolver un mapa de títulos a IDs
+  Future<Map<String, int>> _insertExampleSongs(Database db) async {
     print("[DB] _insertExampleSongs: Insertando canciones de ejemplo...");
     // 1. Obtener IDs de categorías predefinidas para asociarlas
     Map<String, int> categoryMap = {};
@@ -221,6 +225,7 @@ class DatabaseHelper {
       categoryMap[catName] = catId;
     }
 
+    Map<String, int> songIdMap = {}; // Mapa para almacenar título -> ID
     final exampleSongs = [
       // ... (tu lista de exampleSongs aquí, igual que antes) ...
       {
@@ -230,6 +235,7 @@ class DatabaseHelper {
         "tonalidad_original": "G",
         "tempo_bpm": 70,
         "posicion_capo": 0,
+        "preferred_font_size": 16.0, // SOLICITUD: Añadir valor por defecto
         "notas": "Canta el estribillo a capella",
         "enlaces_video": ["https://www.youtube.com/watch?v=ejemplo_ave_maria"],
         "categorias": ["Virgen María", "Adoración"]
@@ -241,6 +247,7 @@ class DatabaseHelper {
         "tonalidad_original": "G",
         "tempo_bpm": 120,
         "posicion_capo": 2,
+        "preferred_font_size": 18.0, // SOLICITUD: Añadir valor por defecto
         "notas": "Canta María el estribillo",
         "enlaces_video": ["https://www.youtube.com/watch?v=ejemplo_alabado"],
         "categorias": ["Entrada", "Adoración"]
@@ -252,6 +259,7 @@ class DatabaseHelper {
         "tonalidad_original": "Am",
         "tempo_bpm": 72,
         "posicion_capo": 0,
+        "preferred_font_size": 16.0, // SOLICITUD: Añadir valor por defecto
         "notas": "",
         "enlaces_video": [],
         "categorias": ["Meditación"]
@@ -263,6 +271,7 @@ class DatabaseHelper {
         "tonalidad_original": "C",
         "tempo_bpm": 110,
         "posicion_capo": 0,
+        "preferred_font_size": 16.0, // SOLICITUD: Añadir valor por defecto
         "notas": "Cantar con entusiasmo",
         "enlaces_video": ["https://www.youtube.com/watch?v=ejemplo_gloria"],
         "categorias": ["Ofertorio", "Adoración"]
@@ -274,6 +283,7 @@ class DatabaseHelper {
         "tonalidad_original": "D",
         "tempo_bpm": 95,
         "posicion_capo": 0,
+        "preferred_font_size": 16.0, // SOLICITUD: Añadir valor por defecto
         "notas": "",
         "enlaces_video": [],
         "categorias": ["Salida"]
@@ -292,7 +302,7 @@ class DatabaseHelper {
         'tempo_bpm': (songData['tempo_bpm'] as num?)?.toInt(), // Cast y conversión
         'posicion_capo': (songData['posicion_capo'] as num?)?.toInt() ?? 0, // Cast, conversión y valor por defecto
         'es_favorita': 0, // Por defecto no favorita
-        'preferred_font_size': null, // Por defecto nulo
+        'preferred_font_size': (songData['preferred_font_size'] as num?)?.toDouble(), // SOLICITUD: Leer valor del mapa
         'contador_reproducciones': 0, // Por defecto 0
         'fecha_creacion': DateTime.now().toIso8601String(), // Fecha actual
         'fecha_modificacion': DateTime.now().toIso8601String(), // Fecha actual
@@ -300,6 +310,7 @@ class DatabaseHelper {
         // 'enlaces_video': (songData['enlaces_video'] as List<dynamic>?)?.cast<String>()?.join(','), // Línea problemática original
         'enlaces_video': _convertVideoLinksToString(songData['enlaces_video']), // Usar función auxiliar
       });
+      songIdMap[songData['titulo'] as String] = songId; // Guardar en el mapa
 
       // 4. Asociar categorías a la canción recién insertada
       // Cast explícito de la lista de categorías
@@ -326,7 +337,39 @@ class DatabaseHelper {
       }
     }
     print("[DB] _insertExampleSongs: ${exampleSongs.length} canciones de ejemplo insertadas.");
+    return songIdMap; // Devolver el mapa
   }
+
+  // SOLICITUD: Función auxiliar para insertar setlists de ejemplo
+  Future<void> _insertExampleSetlists(Database db, Map<String, int> songIdMap) async {
+    print("[DB] _insertExampleSetlists: Insertando setlists de ejemplo...");
+    final setlistCountResult = await db.rawQuery('SELECT COUNT(*) as count FROM setlists');
+    final setlistCount = Sqflite.firstIntValue(setlistCountResult) ?? 0;
+
+    if (setlistCount > 0) {
+      print("[DB] _insertExampleSetlists: Setlists ya existen ($setlistCount), omitiendo inserción.");
+      return;
+    }
+
+    // Insertar el setlist "Bautismo"
+    final bautismoSetlistId = await db.insert('setlists', {
+      'nombre': 'Bautismo', // SOLICITUD: Nombre del setlist
+      'fecha_evento': DateTime.now().add(Duration(days: 7)).toIso8601String(),
+      'notas': 'Setlist para la celebración de un bautismo.',
+      'fecha_creacion': DateTime.now().toIso8601String(),
+      'fecha_modificacion': DateTime.now().toIso8601String(),
+    });
+    print("[DB] _insertExampleSetlists: Setlist 'Bautismo' insertado con ID: $bautismoSetlistId.");
+
+    // Asociar canciones al setlist "Bautismo"
+    await db.insert('setlist_cancion', {'setlist_id': bautismoSetlistId, 'cancion_id': songIdMap['Ave María']!, 'orden': 1, 'transposicion_semitonos': 0, 'capo_personalizado': 0});
+    await db.insert('setlist_cancion', {'setlist_id': bautismoSetlistId, 'cancion_id': songIdMap['Canto de Meditación']!, 'orden': 2, 'transposicion_semitonos': -2, 'capo_personalizado': 2});
+    print("[DB] _insertExampleSetlists: Canciones asociadas al setlist 'Bautismo'.");
+
+    print("[DB] _insertExampleSetlists: Setlists de ejemplo insertados.");
+  }
+
+
 
   // Añadir esta función auxiliar dentro de DatabaseHelper
   String? _convertVideoLinksToString(dynamic videoLinksData) {
