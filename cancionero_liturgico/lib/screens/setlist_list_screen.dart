@@ -42,7 +42,7 @@ class _SetlistListScreenState extends State<SetlistListScreen> {
   Widget build(BuildContext context) {
     print("[SCREEN] Build: SetlistListScreen");
     return Scaffold(
-      appBar: AppBar(title: const Text('Setlists')),
+      appBar: AppBar(title: const Text('Eventos programados')),
       body: FutureBuilder<List<Setlist>>(
         future: _setlistsFuture,
         builder: (context, snapshot) {
@@ -100,15 +100,23 @@ class _SetlistListScreenState extends State<SetlistListScreen> {
                             backgroundColor: Theme.of(context).colorScheme.primary,
                             foregroundColor: Theme.of(context).colorScheme.onPrimary,
                           ),
-                          child: const Icon(Icons.play_arrow, size: 24),
+                          child: const Icon(Icons.play_arrow, size: 30),
                         ),
                       const SizedBox(width: 8), // Espacio entre el botón de play y el de editar
-                      const Icon(Icons.chevron_right), // Icono para editar
+                      // SOLICITUD: Reemplazar el icono de chevron por un botón de edición más claro y con mejor espaciado.
+                      IconButton(
+                        icon: const Icon(Icons.edit),
+                        tooltip: 'Editar Setlist',
+                        style: IconButton.styleFrom(
+                          backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
+                          foregroundColor: Theme.of(context).colorScheme.onSecondaryContainer,
+                        ),
+                        onPressed: () {
+                          _navigateAndRefresh(SetlistManagementScreen(setlist: setlist));
+                        },
+                      ),
                     ],
                   ),
-                  onTap: () {
-                    _navigateAndRefresh(SetlistManagementScreen(setlist: setlist));
-                  },
                 );
               },
             );

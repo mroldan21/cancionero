@@ -25,6 +25,8 @@ class SongDetailScreen extends StatefulWidget {
 
 class _SongDetailScreenState extends State<SongDetailScreen> {
   // No se necesita estado local para la canción, se manejará directamente en el build.
+  // El estado de favorito se gestionará directamente a través de currentSong.isFavorite
+  bool _hasChanges = false; // Para notificar a la pantalla anterior si debe recargar.
 
   void _goToNextSong() {
     if (widget.setlistItems == null) return;
@@ -52,13 +54,23 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
     }
   }
 
-  void _toggleFavorite() {
-    // Usamos widget.song.id porque es la referencia inmutable que recibimos.
+  Future<void> _toggleFavorite(Song currentSong) async {
     final songRepository = Provider.of<SongRepository>(context, listen: false);
-    songRepository.toggleFavorite(widget.song.id!);
-    // El refresco se hará a través del provider o al recargar la lista,
-    // pero para una respuesta visual inmediata, podríamos llamar a setState
-    // y recargar la canción desde la BD. Por ahora, se delega al flujo de datos.
+    final songProvider = Provider.of<SongProvider>(context, listen: false);
+
+    // Determinar el nuevo estado de favorito
+    final newFavoriteState = !currentSong.isFavorite;
+
+    // 1. Actualizar la base de datos de forma atómica.
+    await songRepository.toggleFavorite(currentSong.id!);
+
+    // 2. Crear una nueva instancia de la canción con el estado ya actualizado.
+    final updatedSongInUI = currentSong.copyWith(isFavorite: newFavoriteState);
+
+    // 3. Actualizar el provider para que la UI reaccione inmediatamente.
+    songProvider.setSelectedSong(updatedSongInUI);
+    // Marcar que ha habido cambios.
+    _hasChanges = true;
   }
 
   @override
@@ -71,19 +83,20 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
     final songProvider = Provider.of<SongProvider>(context, listen: true);
     final songRepository = Provider.of<SongRepository>(context, listen: false); // No necesita escuchar
 
-    // SOLUCIÓN DEFINITIVA: Determinar la fuente de verdad para la canción a mostrar.
-    // 1. Prioridad: La canción en el provider, si existe y coincide con la del widget.
-    //    Esto asegura que veamos los cambios inmediatamente después de guardar.
-    // 2. Si no, usar la canción que se pasó al widget.
-    // SOLUCIÓN CORREGIDA: La fuente de verdad principal es la canción del widget.
-    // Solo la sobrescribimos con la del provider si esta es demostrablemente MÁS NUEVA
-    // (lo que ocurre al volver de PresentationScreen después de guardar).
-    Song currentSong = widget.song; // Empezamos con la canción que nos pasan.
-    if (songProvider.currentSong != null &&
-        songProvider.currentSong!.id == widget.song.id &&
-        songProvider.currentSong!.modificationDate.isAfter(currentSong.modificationDate)) {
+    // SOLUCIÓN: Determinar la fuente de verdad para la canción a mostrar.
+    Song currentSong;
+    if (isSetlistMode && songProvider.currentSong != null) {
+      // Si estamos en modo setlist, la canción actual SIEMPRE es la del provider.
       currentSong = songProvider.currentSong!;
+    } else if (songProvider.currentSong != null && songProvider.currentSong!.id == widget.song.id) {
+      // Si no es modo setlist (o el provider aún no se actualizó), pero hay una canción en el provider
+      // que coincide con la del widget, la usamos para reflejar cambios (ej: al volver de editar).
+      currentSong = songProvider.currentSong!;
+    } else {
+      // Como último recurso, usamos la canción que se pasó al widget.
+      currentSong = widget.song;
     }
+
 
     // Usamos PopScope para interceptar la navegación hacia atrás y limpiar el estado.
     // SOLICITUD: Imprimir todos los parámetros de la canción para depuración.
@@ -102,24 +115,30 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
   - preferredFontSize: ${currentSong.preferredFontSize}
 """); // Fin del print de depuración
     return PopScope(
-      canPop: true, // Permitir siempre la navegación hacia atrás.
+      canPop: false, // Interceptar la navegación para devolver un resultado.
       onPopInvoked: (didPop) {
-        // SOLUCIÓN: Al salir de esta pantalla, limpiar el estado del provider.
-        // Esto evita que otras pantallas (como PresentationScreen) usen datos obsoletos.
-        if (didPop) {
-          final songProvider = Provider.of<SongProvider>(context, listen: false);
-          if (isSetlistMode) songProvider.clearSetlistItem();
-          songProvider.clearSelectedSong(); // Limpiar la canción seleccionada
-        }
+        if (didPop) return; // Si ya se hizo pop, no hacer nada.
+        final songProvider = Provider.of<SongProvider>(context, listen: false);
+        if (isSetlistMode) songProvider.clearSetlistItem();
+        songProvider.clearSelectedSong();
+        Navigator.pop(context, _hasChanges); // Devolver si hubo cambios.
       },
       child: Scaffold(
         appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context, _hasChanges), // Devolver si hubo cambios.
+          ),
           title: Text(currentSong.title),
           actions: [
             IconButton(
-              icon: Icon(currentSong.isFavorite ? Icons.star : Icons.star_border),
+              // SOLICITUD: Usar el estado local y añadir color para destacar.
+              icon: Icon(
+                currentSong.isFavorite ? Icons.star : Icons.star_border,
+                color: currentSong.isFavorite ? Colors.redAccent : null,
+              ),
               onPressed: () {
-                _toggleFavorite();
+                _toggleFavorite(currentSong);
               },
             ),
             IconButton(

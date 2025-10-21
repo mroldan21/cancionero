@@ -15,7 +15,7 @@ class SettingsScreen extends StatelessWidget {
     final themeProvider = Provider.of<ThemeProvider>(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Ajustes')),
+      appBar: AppBar(title: const Text('Ajustes de la app')),
       body: ListView(
         children: [
           // --- Sección Visualización ---

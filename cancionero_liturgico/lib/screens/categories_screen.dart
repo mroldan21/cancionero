@@ -51,7 +51,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> with SingleTickerPr
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Categorías'),
+        title: const Text('Organización por Categorías'),
         actions: [
           IconButton(
             icon: const Icon(Icons.search),

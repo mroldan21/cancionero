@@ -292,11 +292,13 @@ class SongRepository {
 
   Future<void> toggleFavorite(int songId) async {
     final db = await _databaseHelper.database;
-    final result = await db.query('songs', columns: ['es_favorita'], where: 'id = ?', whereArgs: [songId]);
-    if (result.isNotEmpty) {
-      final isFavorite = (result.first['es_favorita'] as int) == 1;
-      await db.update('songs', {'es_favorita': isFavorite ? 0 : 1}, where: 'id = ?', whereArgs: [songId]);
-    }
+    // SOLUCIÓN: Usar una única consulta atómica para invertir el estado de favorito.
+    await db.rawUpdate('''
+      UPDATE songs 
+      SET es_favorita = CASE WHEN es_favorita = 1 THEN 0 ELSE 1 END,
+          fecha_modificacion = ?
+      WHERE id = ?
+    ''', [DateTime.now().toIso8601String(), songId]);
   }
 
   Future<void> incrementPlayCount(int songId) async {

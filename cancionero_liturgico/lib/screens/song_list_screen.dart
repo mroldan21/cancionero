@@ -111,22 +111,17 @@ class _SongListScreenState extends State<SongListScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 8.0),
                     itemCount: songs.length,
                     itemBuilder: (context, index) {
-                      final song = songs[index];
-                      return ListTile(
-                        key: ValueKey(song.id),
-                        leading: CircleAvatar(
-                          child: Text('${index + 1}'),
-                        ),
-                        title: Text(song.title),
-                        subtitle: Text(song.author ?? 'Autor desconocido'),
+                      return SongItem(
+                        song: songs[index],
                         onTap: () {
                           // SOLUCIÓN: No es necesario establecer la canción en el provider aquí.
                           // SongDetailScreen la recibirá a través del constructor (widget.song).
                           // Y usamos el método que refresca la lista al volver.
-                          _navigateAndRefreshSongs(SongDetailScreen(song: song)); // CORRECCIÓN: Usar el método que refresca
+                          _navigateAndRefreshSongs(SongDetailScreen(song: songs[index]));
                         },
+                        // El onLongPress se puede añadir aquí si se desea
                         onLongPress: () {
-                          _navigateAndRefreshSongs(SongEditScreen(song: song));
+                          _navigateAndRefreshSongs(SongEditScreen(song: songs[index]));
                         },
                       );
                     },
