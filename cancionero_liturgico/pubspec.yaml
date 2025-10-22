@@ -39,6 +39,9 @@ dependencies:
 
   # También necesitas wakelock_plus para el modo presentación
   wakelock_plus: ^1.2.5
+  device_info_plus: ^9.0.0
+  http: ^1.1.0
+
   
 
 dev_dependencies:

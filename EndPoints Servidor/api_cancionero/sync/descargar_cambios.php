@@ -27,16 +27,20 @@ try {
     $db = $database->getConnection();
 
     // Obtener canciones modificadas/creadas después de la última sync
+    // Consulta CORREGIDA - usando nombres exactos de Flutter
     $query = "SELECT 
-                s.*,
+                s.id, s.titulo, s.autor, s.letra_con_acordes, s.tonalidad_original,
+                s.tempo_bpm, s.posicion_capo, s.es_favorita, s.preferred_font_size,
+                s.contador_reproducciones, s.fecha_creacion, s.fecha_modificacion,
+                s.notas, s.enlaces_video,
                 GROUP_CONCAT(DISTINCT c.nombre) as categorias
-              FROM songs s
-              LEFT JOIN cancion_categoria cc ON s.id = cc.cancion_id
-              LEFT JOIN categories c ON cc.categoria_id = c.id
-              WHERE s.activo = 1 
+            FROM songs s
+            LEFT JOIN cancion_categoria cc ON s.id = cc.cancion_id
+            LEFT JOIN categories c ON cc.categoria_id = c.id
+            WHERE s.activo = 1 
                 AND s.fecha_modificacion > ?
-              GROUP BY s.id
-              ORDER BY s.fecha_modificacion DESC";
+            GROUP BY s.id
+            ORDER BY s.fecha_modificacion DESC";
 
     $stmt = $db->prepare($query);
     $stmt->execute([$ultima_sync]);

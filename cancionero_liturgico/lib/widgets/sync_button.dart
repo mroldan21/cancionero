@@ -29,15 +29,15 @@ class SyncButton extends StatelessWidget {
                   right: 0,
                   top: 0,
                   child: Container(
-                    padding: EdgeInsets.all(2),
-                    decoration: BoxDecoration(
+                    width: 12,
+                    height: 12,
+                    decoration: const BoxDecoration(
                       color: Colors.orange,
                       shape: BoxShape.circle,
                     ),
-                    child: SizedBox(
-                      width: 8,
-                      height: 8,
-                      child: CircularProgressIndicator(
+                    child: const Padding(
+                      padding: EdgeInsets.all(2.0),
+                      child: CircularProgressIndicator.adaptive(
                         strokeWidth: 2,
                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
@@ -60,12 +60,13 @@ class SyncButton extends StatelessWidget {
       final resultado = await syncProvider.sincronizar();
       
       // Mostrar snackbar con resultado
-      if (resultado.success) {
-        _mostrarSnackbarExito(context, resultado);
-      } else {
-        _mostrarSnackbarError(context, resultado.message);
+      if (context.mounted) {
+        if (resultado.success) {
+          _mostrarSnackbarExito(context, resultado);
+        } else {
+          _mostrarSnackbarError(context, resultado.message);
+        }
       }
-      
     } catch (e) {
       _mostrarSnackbarError(context, 'Error: $e');
     }

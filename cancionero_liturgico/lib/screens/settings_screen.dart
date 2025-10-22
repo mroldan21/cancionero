@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cancionero_liturgico/widgets/sync_button.dart';
 import 'package:cancionero_liturgico/services/theme_provider.dart';
 // import 'package:file_picker/file_picker.dart'; // Ya no se necesita
 // import 'dart:convert'; // Ya no se necesita
@@ -15,7 +16,12 @@ class SettingsScreen extends StatelessWidget {
     final themeProvider = Provider.of<ThemeProvider>(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Ajustes de la app')),
+      appBar: AppBar(
+        title: const Text('Ajustes de la app'),
+        actions: const [
+          SyncButton(),
+        ],
+      ),
       body: ListView(
         children: [
           // --- Sección Visualización ---
@@ -104,16 +110,6 @@ class SettingsScreen extends StatelessWidget {
           //     await prefs.setBool('sync_auto', value);
           //   },
           // ),
-          ListTile(
-            title: const Text('Sincronizar Ahora'),
-            leading: const Icon(Icons.sync),
-            onTap: () {
-              // Llamar a la lógica de sincronización
-              // final syncService = Provider.of<SyncService>(context, listen: false);
-              // syncService.synchronize();
-              print("Sincronización manual iniciada (simulada)");
-            },
-          ),
           // Mostrar última fecha de sincronización
           // FutureBuilder<String>(
           //   future: _getLastSyncDate(),
