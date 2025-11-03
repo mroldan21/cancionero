@@ -236,19 +236,18 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
                     'Videos:',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
-                  // SOLUCIÓN: Envolver la columna de videos en IntrinsicWidth para resolver el error de layout.
-                  IntrinsicWidth(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: currentSong.videoLinks!.map(
-                        (link) => ListTile(
-                          title: Text(link, style: const TextStyle(color: Colors.blue), overflow: TextOverflow.ellipsis),
-                          onTap: () {
-                            // launchUrl(Uri.parse(link));
-                          },
-                        ),
-                      ).toList(),
-                    ),
+                  // CORRECCIÓN: Se elimina IntrinsicWidth para evitar el RenderFlex overflow.
+                  // La columna se ajustará al ancho disponible por defecto.
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: currentSong.videoLinks!.map(
+                      (link) => ListTile(
+                        title: Text(link, style: const TextStyle(color: Colors.blue), overflow: TextOverflow.ellipsis),
+                        onTap: () {
+                          // launchUrl(Uri.parse(link));
+                        },
+                      ),
+                    ).toList(),
                   ),
                 ],
               ],

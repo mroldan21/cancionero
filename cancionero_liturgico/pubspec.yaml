@@ -41,6 +41,7 @@ dependencies:
   wakelock_plus: ^1.2.5
   device_info_plus: ^9.0.0
   http: ^1.1.0
+  collection: ^1.18.0
 
   
 

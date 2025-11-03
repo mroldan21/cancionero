@@ -37,8 +37,7 @@ try {
             FROM songs s
             LEFT JOIN cancion_categoria cc ON s.id = cc.cancion_id
             LEFT JOIN categories c ON cc.categoria_id = c.id
-            WHERE s.activo = 1 
-                AND s.fecha_modificacion > ?
+            WHERE s.fecha_modificacion > ?
             GROUP BY s.id
             ORDER BY s.fecha_modificacion DESC";
 
@@ -46,24 +45,24 @@ try {
     $stmt->execute([$ultima_sync]);
     $canciones = $stmt->fetchAll();
 
-    // Obtener IDs de canciones eliminadas (marcadas como inactivas)
-    $query = "SELECT id FROM songs 
-              WHERE activo = 0 AND fecha_modificacion > ?";
-    $stmt = $db->prepare($query);
-    $stmt->execute([$ultima_sync]);
-    $eliminadas = $stmt->fetchAll(PDO::FETCH_COLUMN, 0);
+    // CORRECCIÓN: La lógica de eliminación se maneja en otro endpoint o no se usa.
+    // Por ahora, devolvemos un array vacío para mantener la estructura de la respuesta.
+    // Si tienes una tabla de 'elementos_eliminados', la consulta iría aquí.
+    $eliminadas = [];
 
     // Obtener setlists modificados
+    // CORRECCIÓN: Se elimina la condición 'activo = 1' que no existe.
     $query = "SELECT * FROM setlists 
-              WHERE activo = 1 AND fecha_modificacion > ?";
+              WHERE fecha_modificacion > ?";
     $stmt = $db->prepare($query);
     $stmt->execute([$ultima_sync]);
     $setlists = $stmt->fetchAll();
 
-    // Obtener relaciones setlist-canción modificadas
+    // CORRECCIÓN: Obtener todas las relaciones para los setlists que han sido modificados.
+    // La tabla 'setlist_cancion' no tiene su propio timestamp.
     $query = "SELECT sc.* FROM setlist_cancion sc
               INNER JOIN setlists s ON sc.setlist_id = s.id
-              WHERE s.activo = 1 AND sc.fecha_creacion > ?";
+              WHERE s.fecha_modificacion > ?";
     $stmt = $db->prepare($query);
     $stmt->execute([$ultima_sync]);
     $setlist_canciones = $stmt->fetchAll();

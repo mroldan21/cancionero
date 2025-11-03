@@ -69,22 +69,28 @@ class SyncService {
   // 1. Iniciar sincronización
   Future<SyncSession> _iniciarSincronizacion() async {
     final deviceId = await _getDeviceId();
+    print("SYNC_DEBUG: 1. ➡️  Iniciando Sincronización para dispositivo: $deviceId");
     final ultimaSync = await _getUltimaSincronizacion();
     
+    final requestBody = {
+      'dispositivo_id': deviceId,
+      'hash_local': await _generarHashLocal(),
+      'version_app': '1.0.0',
+      'ultima_sincronizacion': ultimaSync.toIso8601String(),
+    };
+
+    print("SYNC_DEBUG: 1.1. 📦 Enviando cuerpo de la petición a iniciar_sync.php: ${json.encode(requestBody)}");
+
     final response = await http.post(
       Uri.parse('$_baseUrl/iniciar_sync.php'),
       headers: {'Content-Type': 'application/json'},
-      body: json.encode({
-        'dispositivo_id': deviceId,
-        'hash_local': await _generarHashLocal(),
-        'version_app': '1.0.0',
-        'ultima_sincronizacion': ultimaSync.toIso8601String(),
-      }),
+      body: json.encode(requestBody),
     );
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       if (data['success'] == true) {
+        print("SYNC_DEBUG: 1.2. ✅ Sesión obtenida del servidor: ${data['data']['session_id']}");
         return SyncSession.fromJson(data['data']);
       } else {
         throw Exception('Error del servidor: ${data['message']}');
@@ -97,6 +103,7 @@ class SyncService {
   // 2. Recolectar cambios locales
   Future<List<CambioLocal>> _recolectarCambiosLocales() async {
     try {
+      print("SYNC_DEBUG: 2. 🔍 Recolectando cambios locales...");
       final List<CambioLocal> cambios = [];
       final ultimaSync = await _getUltimaSincronizacion();
       
@@ -104,6 +111,7 @@ class SyncService {
       final cancionesLocales = await songRepository.getModifiedSongsAfter(ultimaSync);
       
       for (final cancion in cancionesLocales) {
+        print("SYNC_DEBUG: 2.1. 📄 Canción local modificada encontrada: '${cancion.title}' (ID: ${cancion.id})");
         // Determinar tipo de cambio
         String tipo = cancion.creationDate.isAfter(ultimaSync) ? 'crear' : 'actualizar';
         // Convertir la canción a JSON para ser enviada
@@ -121,6 +129,7 @@ class SyncService {
       // cambios.addAll(await _recolectarCambiosSetlists(ultimaSync));
       // cambios.addAll(await _recolectarCambiosCategorias(ultimaSync));
       
+      print("SYNC_DEBUG: 2.2. ✅ Total de cambios locales recolectados: ${cambios.length}");
       return cambios;
     } catch (e) {
       print('Error recolectando cambios locales: $e');
@@ -131,6 +140,7 @@ class SyncService {
   // 3. Subir cambios locales al servidor
   Future<ResultadoSync> _subirCambiosLocales(String sessionId, List<CambioLocal> cambios) async {
     final deviceId = await _getDeviceId();
+    print("SYNC_DEBUG: 3. 📤 Subiendo ${cambios.length} cambios al servidor...");
     
     final response = await http.post(
       Uri.parse('$_baseUrl/subir_cambios.php'),
@@ -145,6 +155,7 @@ class SyncService {
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       if (data['success'] == true) {
+        print("SYNC_DEBUG: 3.1. ✅ Respuesta del servidor a la subida: ${data['message']}");
         return ResultadoSync.fromJson(data['data']);
       } else {
         throw Exception('Error al subir cambios: ${data['message']}');
@@ -157,6 +168,7 @@ class SyncService {
   // 4. Descargar cambios del servidor
   Future<RespuestaDescarga> _descargarCambiosServidor(String sessionId) async {
     final deviceId = await _getDeviceId();
+    print("SYNC_DEBUG: 4. 📥 Descargando cambios del servidor...");
     final ultimaSync = await _getUltimaSincronizacion();
     
     final response = await http.post(
@@ -172,6 +184,7 @@ class SyncService {
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       if (data['success'] == true) {
+        print("SYNC_DEBUG: 4.1. ✅ Cambios descargados: ${data['data']['total_cambios']}");
         return RespuestaDescarga.fromJson(data['data']);
       } else {
         throw Exception('Error al descargar cambios: ${data['message']}');
@@ -183,13 +196,16 @@ class SyncService {
 
   // 5. Aplicar cambios del servidor localmente
   Future<void> _aplicarCambiosLocales(RespuestaDescarga cambios) async {
+    print("SYNC_DEBUG: 5. 🔄 Aplicando cambios en la base de datos local...");
     // Procesar canciones nuevas/actualizadas
     for (final cancionData in cambios.canciones) {
+      print("SYNC_DEBUG: 5.1. 🎶 Procesando canción descargada: ${cancionData['titulo']}");
       await _procesarCancionDescargada(cancionData);
     }
     
     // Procesar canciones eliminadas
     for (final idEliminado in cambios.cancionesEliminadas) {
+      print("SYNC_DEBUG: 5.2. 🗑️ Eliminando canción con ID: $idEliminado");
       await songRepository.deleteSong(idEliminado);
     }
     
@@ -202,11 +218,13 @@ class SyncService {
     for (final relacionData in cambios.setlistCanciones) {
       await _procesarRelacionSetlistCancion(relacionData);
     }
+    print("SYNC_DEBUG: 5.4. ✅ Finalizada la aplicación de cambios locales.");
   }
 
   // 6. Finalizar sincronización
   Future<void> _finalizarSincronizacion(String sessionId, String estado, [Map<String, dynamic>? detalles]) async {
     final deviceId = await _getDeviceId();
+    print("SYNC_DEBUG: 6. 🏁 Finalizando sesión de sincronización con estado: '$estado'");
     
     try {
       final response = await http.post(
@@ -233,23 +251,21 @@ class SyncService {
     String sessionId = '';
     
     try {
-      print('🔄 Iniciando proceso de sincronización...');
+      print('--- INICIO DEL PROCESO DE SINCRONIZACIÓN ---');
       
       // Paso 1: Iniciar sesión de sync
       final session = await _iniciarSincronizacion();
       sessionId = session.sessionId;
-      print('✅ Sesión de sync iniciada: $sessionId');
       
       // Paso 2: Recolectar cambios locales
       final cambiosLocales = await _recolectarCambiosLocales();
-      print('📤 ${cambiosLocales.length} cambios locales recolectados');
       
       // Paso 3: Subir cambios locales
       ResultadoSync resultadoSubida;
       if (cambiosLocales.isNotEmpty) {
         resultadoSubida = await _subirCambiosLocales(sessionId, cambiosLocales);
-        print('✅ ${resultadoSubida.cancionesSubidas} cambios subidos al servidor');
       } else {
+        print("SYNC_DEBUG: 3. ✨ No hay cambios locales para subir.");
         resultadoSubida = ResultadoSync(
           success: true,
           message: 'Sin cambios locales para subir',
@@ -259,12 +275,10 @@ class SyncService {
       
       // Paso 4: Descargar cambios del servidor
       final cambiosServidor = await _descargarCambiosServidor(sessionId);
-      print('📥 ${cambiosServidor.totalCambios} cambios descargados del servidor');
       
       // Paso 5: Aplicar cambios localmente
       if (cambiosServidor.totalCambios > 0) {
         await _aplicarCambiosLocales(cambiosServidor);
-        print('✅ Cambios del servidor aplicados localmente');
       }
       
       // Paso 6: Actualizar última fecha de sync
@@ -276,7 +290,7 @@ class SyncService {
         'cambios_descargados': cambiosServidor.totalCambios,
       });
       
-      print('🎉 Sincronización completada exitosamente');
+      print('--- 🎉 SINCRONIZACIÓN COMPLETADA EXITOSAMENTE 🎉 ---');
       
       return ResultadoSync(
         success: true,
@@ -288,7 +302,7 @@ class SyncService {
       );
       
     } catch (e) {
-      print('❌ Error en sincronización: $e');
+      print('--- ❌ ERROR FATAL EN SINCRONIZACIÓN: $e ---');
       
       // Finalizar con error
       if (sessionId.isNotEmpty) {
@@ -351,7 +365,8 @@ class SyncService {
   }
 
   Future<void> _procesarCancionDescargada(Map<String, dynamic> cancionData) async {
-    // CORRECCIÓN: Mapear desde las claves del JSON (snake_case) a las propiedades del modelo local (camelCase).
+    print("SYNC_DEBUG: 5.1.1. ⚙️  Datos JSON recibidos: ${json.encode(cancionData)}");
+    // 1. Crear el objeto Song desde los datos del servidor
     final cancion = Song(
       id: cancionData['id'] as int,
       title: cancionData['titulo'] as String,
@@ -360,8 +375,9 @@ class SyncService {
       originalKey: cancionData['tonalidad_original'] as String,
       tempoBpm: cancionData['tempo_bpm'] as int?,
       capoPosition: (cancionData['posicion_capo'] as int?) ?? 0,
-      isFavorite: (cancionData['es_favorita'] as int?) == 1,
-      preferredFontSize: (cancionData['preferred_font_size'] as num?)?.toDouble() ?? 16.0,
+      isFavorite: (cancionData['es_favorita'] as int? ?? 0) == 1,
+      // CORRECCIÓN: Parsear de forma segura el tamaño de fuente, que puede venir como String desde PHP.
+      preferredFontSize: double.tryParse(cancionData['preferred_font_size']?.toString() ?? '16.0') ?? 16.0,
       playCount: (cancionData['contador_reproducciones'] as int?) ?? 0,
       notes: cancionData['notas'],
       videoLinks: cancionData['enlaces_video'] != null && (cancionData['enlaces_video'] as String).isNotEmpty
@@ -372,30 +388,42 @@ class SyncService {
       // categoryIds se poblará después de procesar las categorías
     );
 
-    // Procesar categorías
+    // 2. Procesar y asignar categorías
+    List<int> categoryIds = [];
     if (cancionData['categorias'] != null) {
       final categoriasNombres = cancionData['categorias'].toString().split(',');
       final List<Category> categorias = [];
       for (final nombre in categoriasNombres) {
-        categorias.add(await categoryRepository.getOrCreateCategoryByName(nombre.trim()));
+        if (nombre.trim().isNotEmpty) {
+          categorias.add(await categoryRepository.getOrCreateCategoryByName(nombre.trim()));
+        }
       }
-      // Asignar los IDs de las categorías obtenidas/creadas al campo `categoryIds` del objeto `Song`
-      final songWithCategories = cancion.copyWith(
-        categoryIds: categorias.map((c) => c.id!).toList()
-      );
-      
-      // Guardar canción con las categorías asociadas
-      if (await songRepository.songExists(songWithCategories.id!)) {
-        await songRepository.updateSong(songWithCategories);
-      } else {
-        await songRepository.insertSong(songWithCategories);
-      }
+      categoryIds = categorias.map((c) => c.id!).toList();
+    }
+
+    final remoteSong = cancion.copyWith(categoryIds: categoryIds);
+
+    // 3. Comparar con la versión local antes de actualizar
+    final localSong = await songRepository.getSongById(remoteSong.id!);
+
+    if (localSong == null) {
+      // La canción no existe localmente, la insertamos.
+      print("SYNC_DEBUG: 5.1.2. ➕ Insertando nueva canción: '${remoteSong.title}'");
+      await songRepository.insertSong(remoteSong);
+      // También necesitamos insertar las relaciones de categoría
+      await songRepository.setCategoriasForSong(remoteSong.id!, remoteSong.categoryIds);
     } else {
-      // Guardar canción sin categorías
-      if (await songRepository.songExists(cancion.id!)) {
-        await songRepository.updateSong(cancion);
+      // La canción existe, comparamos si son diferentes.
+      // Esta comparación asume que has implementado `operator ==` en el modelo Song.
+      if (localSong != remoteSong) {
+        print("SYNC_DEBUG: 5.1.2. 🔄 Actualizando canción existente porque se detectaron cambios: '${remoteSong.title}'");
+        // Solo actualizamos si hay diferencias reales.
+        await songRepository.updateSong(remoteSong);
+        // También actualizamos las categorías por si han cambiado.
+        await songRepository.setCategoriasForSong(remoteSong.id!, remoteSong.categoryIds);
       } else {
-        await songRepository.insertSong(cancion);
+        // No hay diferencias, no hacemos nada.
+        print("SYNC_DEBUG: 5.1.2. ✨ Omitiendo actualización para '${remoteSong.title}', no hay cambios detectados.");
       }
     }
   }

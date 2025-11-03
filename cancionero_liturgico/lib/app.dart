@@ -5,6 +5,9 @@ import 'package:cancionero_liturgico/services/song_provider.dart';
 import 'package:cancionero_liturgico/services/theme_provider.dart';
 import 'package:cancionero_liturgico/services/category_repository.dart';
 import 'package:cancionero_liturgico/services/song_repository.dart';
+import 'package:cancionero_liturgico/services/setlist_repository.dart';
+import 'package:cancionero_liturgico/services/sync_provider.dart';
+import 'package:cancionero_liturgico/services/sync_service.dart';
 import 'package:cancionero_liturgico/services/presentation_state_service.dart';
 
 class MyApp extends StatelessWidget {
@@ -18,10 +21,22 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         Provider(create: (_) => CategoryRepository()),
         Provider(create: (_) => SongRepository()),
+        Provider(create: (_) => SetlistRepository()),
         // MEJORA: Registrar el nuevo servicio para que esté disponible en la app.
         ChangeNotifierProvider(
           create: (context) => PresentationStateService(
             Provider.of<SongRepository>(context, listen: false),
+          ),
+        ),
+        // SOLUCIÓN: Registrar SyncProvider para que esté disponible en toda la app.
+        ChangeNotifierProvider<SyncProvider>(
+          create: (context) => SyncProvider(
+            syncService: SyncService(
+              // context.read() obtiene los repositorios que ya fueron provistos arriba.
+              songRepository: context.read<SongRepository>(),
+              categoryRepository: context.read<CategoryRepository>(),
+              setlistRepository: context.read<SetlistRepository>(),
+            ),
           ),
         ),
       ],

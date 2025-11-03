@@ -65,27 +65,43 @@ class SettingsScreen extends StatelessWidget {
           FutureBuilder<double>(
             future: _loadScrollFactor(), // Llamar a la función estática o moverla a una clase State
             builder: (context, snapshot) {
-              double factor = snapshot.data ?? 1.0;
-              return ListTile(
-                title: const Text('Factor de Ajuste del Tempo'),
-                subtitle: Text('${factor.toStringAsFixed(1)}x'),
-                trailing: SizedBox(
-                  width: 150,
-                  child: Slider(
-                    value: factor,
-                    min: 0.5,
-                    max: 2.0,
-                    divisions: 30, // 0.5 a 2.0 en pasos de 0.05
-                    label: factor.toStringAsFixed(1),
-                    // --- CORRECCIÓN 2: Eliminar setState ---
-                    onChanged: (value) async {
-                      final prefs = await SharedPreferences.getInstance();
-                      await prefs.setDouble('scroll_factor_adjust', value);
-                      // setState(() {}); // Eliminado: No es necesario en un StatefulWidget padre ni en un StatelessWidget
-                      // El FutureBuilder se reconstruirá automáticamente en la próxima reconstrucción del widget padre
-                      // o cuando se vuelva a visitar esta pantalla si se almacena el valor globalmente y se escucha.
-                    },
-                  ),
+              if (!snapshot.hasData) {
+                return const ListTile(title: Text('Factor de Ajuste del Tempo'), subtitle: Text('Cargando...'));
+              }
+              double factor = snapshot.data!;
+              // CORRECCIÓN: Usar una Row con Expanded para el Slider para evitar el RenderFlex overflow.
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 2, // Dar más espacio al texto
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Factor de Ajuste del Tempo', style: TextStyle(fontSize: 16)),
+                          Text('${factor.toStringAsFixed(1)}x', style: Theme.of(context).textTheme.bodySmall),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      flex: 3, // Dar más espacio al slider
+                      child: Slider(
+                        value: factor,
+                        min: 0.5,
+                        max: 2.0,
+                        divisions: 30,
+                        label: factor.toStringAsFixed(1),
+                        onChanged: (value) async {
+                          // El onChanged no necesita setState aquí porque el FutureBuilder se reconstruirá
+                          // cuando el widget padre lo haga. Para una actualización en tiempo real,
+                          // este widget debería convertirse en un StatefulWidget.
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.setDouble('scroll_factor_adjust', value);
+                        },
+                      ),
+                    ),
+                  ],
                 ),
               );
             },

@@ -1,3 +1,5 @@
+import 'package:collection/collection.dart';
+
 class Song {
   final int? id;
   final String title;
@@ -113,5 +115,43 @@ class Song {
       preferredFontSize: preferredFontSize ?? this.preferredFontSize,
       categoryIds: categoryIds ?? this.categoryIds,
     );
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    final listEquals = const DeepCollectionEquality().equals;
+
+    return other is Song &&
+        other.id == id &&
+        other.title == title &&
+        other.author == author &&
+        other.content == content &&
+        other.originalKey == originalKey &&
+        other.tempoBpm == tempoBpm &&
+        other.capoPosition == capoPosition &&
+        other.isFavorite == isFavorite &&
+        other.preferredFontSize == preferredFontSize &&
+        other.notes == notes &&
+        listEquals(other.videoLinks, videoLinks) &&
+        listEquals(other.categoryIds, categoryIds);
+  }
+
+  @override
+  int get hashCode {
+    final listHash = const DeepCollectionEquality().hash;
+
+    return id.hashCode ^
+      title.hashCode ^
+      author.hashCode ^
+      content.hashCode ^
+      originalKey.hashCode ^
+      tempoBpm.hashCode ^
+      capoPosition.hashCode ^
+      isFavorite.hashCode ^
+      preferredFontSize.hashCode ^
+      notes.hashCode ^
+      listHash(videoLinks) ^
+      listHash(categoryIds);
   }
 }

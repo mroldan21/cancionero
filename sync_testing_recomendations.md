@@ -1,3 +1,57 @@
+
+### B. Pruebas de Integración (`sync_integration_test.dart`)
+
+**Objetivo:** Probar la interacción completa del `SyncService` con una instancia real de la base de datos local y el servidor remoto de pruebas.
+
+#### Configuración (Setup):
+-   Inicializar una base de datos de prueba en memoria o en un archivo temporal (`sqflite_common_ffi`).
+-   Crear instancias reales de `SongRepository`, `CategoryRepository`, y `SetlistRepository` que apunten a esta BD de prueba.
+-   Crear una instancia de `SyncService` con estos repositorios.
+-   **Importante:** Apuntar el `_baseUrl` del `SyncService` al servidor de desarrollo real (`cincomasuno.ar`). No se usará un mock de red para estas pruebas.
+-   Asegurarse de que la base de datos remota esté en un estado conocido (ej. vacía) antes de cada suite de pruebas.
+
+#### Escenarios:
+
+    -   **Setup:** Insertar una nueva canción en la BD de prueba local. La BD remota debe estar vacía.
+    -   **Acción:** Llamar a `sincronizarAhora()`.
+    -   **Verificación:**
+        1.  La llamada a `sincronizarAhora()` debe devolver un resultado exitoso.
+        2.  Consultar la BD remota directamente y verificar que la nueva canción y sus categorías asociadas fueron creadas.
+
+2.  **Descarga y aplicación de una canción actualizada:**
+    -   **Setup:**
+        1.  Realizar una sincronización inicial para poblar la BD remota y local.
+        2.  Modificar manualmente una canción en la BD **remota** (ej. cambiar el título y actualizar `fecha_modificacion`).
+    -   **Acción:** Llamar a `sincronizarAhora()`.
+    -   **Verificación:** Consultar la BD de prueba **local** y verificar que la canción ahora tiene los datos actualizados del servidor.
+
+3.  **Descarga y aplicación de una canción eliminada:**
+    -   **Setup:**
+        1.  Realizar una sincronización inicial.
+        2.  Marcar una canción como eliminada en la BD **remota** (según la lógica de tu API, puede ser un flag `is_deleted` o moverla a otra tabla).
+    -   **Acción:** Llamar a `sincronizarAhora()`.
+    -   **Verificación:** Consultar la BD de prueba **local** y verificar que la canción ya no existe.
+
+4.  **Creación de categorías durante la descarga:**
+    -   **Setup:**
+        1.  Realizar una sincronización inicial.
+        2.  En la BD **remota**, crear una nueva canción y asociarla a un nombre de categoría que no exista localmente.
+    -   **Acción:** Llamar a `sincronizarAhora()`.
+    -   **Verificación:** Consultar la BD **local** y verificar que tanto la canción como la nueva categoría fueron creadas correctamente.
+
+### C. Pruebas de Extremo a Extremo (E2E) (`app_test.dart`)
+
+
+
+
+
+
+
+
+
+
+
+
 # Recomendaciones para Pruebas de Sincronización
 
 Este documento describe una estrategia para probar la funcionalidad de sincronización (`SyncService` y `SyncProvider`) de la aplicación Cancionero Litúrgico.

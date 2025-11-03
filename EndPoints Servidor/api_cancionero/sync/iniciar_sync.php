@@ -51,6 +51,9 @@ try {
     $stmt->execute();
     $server_info = $stmt->fetch();
 
+    // CORRECCIÓN: Manejar el caso en que la tabla de configuración está vacía.
+    $ultima_actualizacion_servidor = $server_info ? $server_info['ultima_actualizacion'] : null;
+
     // Obtener estadísticas
     $query = "SELECT 
                 COUNT(*) as total_canciones,
@@ -66,7 +69,7 @@ try {
 
     ResponseHelper::sendSuccess([
         'session_id' => uniqid('sync_', true),
-        'ultima_actualizacion_servidor' => $server_info['ultima_actualizacion'],
+        'ultima_actualizacion_servidor' => $ultima_actualizacion_servidor,
         'estadisticas_servidor' => $stats,
         'timestamp' => date('c')
     ], "Sincronización iniciada correctamente");
