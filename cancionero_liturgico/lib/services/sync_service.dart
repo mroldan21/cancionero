@@ -9,7 +9,9 @@ import '../models/category.dart'; // Asegúrate que este modelo exista y sea cor
 import '../models/setlist_model.dart'; // CORRECCIÓN: Importar el modelo correcto para Setlist
 import './song_repository.dart';
 import './category_repository.dart';
+import '../models/setlist.dart'; // CORRECCIÓN: Importar el repositorio faltante
 import './setlist_repository.dart'; // CORRECCIÓN: Importar el repositorio faltante
+
 
 class SyncService {
   static const String _baseUrl = 'https://cincomasuno.ar/api_cancionero/sync';
@@ -99,11 +101,11 @@ class SyncService {
       final ultimaSync = await _getUltimaSincronizacion();
       
       // Obtener canciones modificadas localmente
-      final cancionesLocales = await songRepository.getCancionesModificadasDespuesDe(ultimaSync);
+      final cancionesLocales = await songRepository.getModifiedSongsAfter(ultimaSync);
       
       for (final cancion in cancionesLocales) {
         // Determinar tipo de cambio
-        String tipo = cancion.fechaCreacion.isAfter(ultimaSync) ? 'crear' : 'actualizar';
+        String tipo = cancion.creationDate.isAfter(ultimaSync) ? 'crear' : 'actualizar';
         // Convertir la canción a JSON para ser enviada
         final cancionJson = await _convertirCancionAJson(cancion);
         
@@ -188,7 +190,7 @@ class SyncService {
     
     // Procesar canciones eliminadas
     for (final idEliminado in cambios.cancionesEliminadas) {
-      await songRepository.eliminarCancion(idEliminado);
+      await songRepository.deleteSong(idEliminado);
     }
     
     // Procesar setlists
@@ -306,9 +308,9 @@ class SyncService {
   // Métodos auxiliares
   Future<String> _generarHashLocal() async {
     // Generar hash basado en las canciones locales
-    final canciones = await songRepository.obtenerTodasCanciones();
+    final canciones = await songRepository.getAllSongs();
     final contenido = canciones.map((c) => 
-      '${c.titulo}${c.autor}${c.letraConAcordes}${c.tonalidadOriginal}'
+      '${c.title}${c.author}${c.content}${c.originalKey}'
     ).join('');
     
     // Usar un algoritmo simple de hash (en producción usaría package:crypto)
@@ -342,7 +344,7 @@ class SyncService {
       'contador_reproducciones': cancion.playCount,
       'fecha_creacion': cancion.creationDate.toIso8601String(),
       'fecha_modificacion': cancion.modificationDate.toIso8601String(),
-      'notas': cancion.notas,
+      'notas': cancion.notes,
       'enlaces_video': cancion.videoLinks != null ? json.encode(cancion.videoLinks) : null,
       'categorias': categoryNames,
     };
@@ -361,7 +363,7 @@ class SyncService {
       isFavorite: (cancionData['es_favorita'] as int?) == 1,
       preferredFontSize: (cancionData['preferred_font_size'] as num?)?.toDouble() ?? 16.0,
       playCount: (cancionData['contador_reproducciones'] as int?) ?? 0,
-      notas: cancionData['notas'],
+      notes: cancionData['notas'],
       videoLinks: cancionData['enlaces_video'] != null && (cancionData['enlaces_video'] as String).isNotEmpty
           ? List<String>.from(json.decode(cancionData['enlaces_video']))
           : null,
@@ -373,42 +375,29 @@ class SyncService {
     // Procesar categorías
     if (cancionData['categorias'] != null) {
       final categoriasNombres = cancionData['categorias'].toString().split(',');
-      final categorias = await Future.wait(
-        categoriasNombres.map((nombre) => _obtenerOCrearCategoria(nombre.trim()))
-      );
+      final List<Category> categorias = [];
+      for (final nombre in categoriasNombres) {
+        categorias.add(await categoryRepository.getOrCreateCategoryByName(nombre.trim()));
+      }
       // Asignar los IDs de las categorías obtenidas/creadas al campo `categoryIds` del objeto `Song`
       final songWithCategories = cancion.copyWith(
-        categoryIds: categorias.where((c) => c != null).map((c) => c!.id!).toList()
+        categoryIds: categorias.map((c) => c.id!).toList()
       );
       
       // Guardar canción con las categorías asociadas
-      if (await songRepository.existeCancion(songWithCategories.id)) {
+      if (await songRepository.songExists(songWithCategories.id!)) {
         await songRepository.updateSong(songWithCategories);
       } else {
         await songRepository.insertSong(songWithCategories);
       }
     } else {
       // Guardar canción sin categorías
-      if (await songRepository.existeCancion(cancion.id)) {
+      if (await songRepository.songExists(cancion.id!)) {
         await songRepository.updateSong(cancion);
       } else {
         await songRepository.insertSong(cancion);
       }
     }
-  }
-
-  Future<Category?> _obtenerOCrearCategoria(String nombre) async {
-    var categoria = await categoryRepository.obtenerCategoriaPorNombre(nombre);
-    if (categoria == null) {
-      // Crear categoría personalizada
-      categoria = Category(
-        nombre: nombre,
-        color: '#607D8B', // Color por defecto para categorías personalizadas
-        esPredefinida: false,
-      );
-      await categoryRepository.insertCategory(categoria);
-    }
-    return categoria;
   }
 
   Future<void> _procesarSetlistDescargado(Map<String, dynamic> setlistData) async {

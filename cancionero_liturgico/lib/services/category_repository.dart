@@ -103,4 +103,57 @@ class CategoryRepository {
     }
     await batch.commit(noResult: true);
   }
+
+  // Nuevo método para obtener nombres de categorías por sus IDs (usado por SyncService)
+  Future<List<String>> getCategoryNamesByIds(List<int> ids) async {
+    if (ids.isEmpty) {
+      return [];
+    }
+    final db = await _databaseHelper.database;
+    final placeholders = List.filled(ids.length, '?').join(',');
+    final List<Map<String, dynamic>> maps = await db.query(
+      'categories',
+      columns: ['nombre'],
+      where: 'id IN ($placeholders)',
+      whereArgs: ids,
+    );
+
+    return maps.map((map) => map['nombre'] as String).toList();
+  }
+
+  // Nuevo método para obtener una categoría por su nombre (usado por SyncService)
+  Future<Category?> getCategoryByName(String name) async {
+    final db = await _databaseHelper.database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'categories',
+      where: 'LOWER(nombre) = LOWER(?)', // Búsqueda insensible a mayúsculas
+      whereArgs: [name],
+      limit: 1,
+    );
+
+    if (maps.isNotEmpty) {
+      return Category.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  // Nuevo método para obtener o crear una categoría por su nombre (usado por SyncService)
+  Future<Category> getOrCreateCategoryByName(String name) async {
+    final db = await _databaseHelper.database; // CORRECCIÓN: Faltaba inicializar la instancia de la BD.
+    Category? category = await getCategoryByName(name);
+    if (category == null) {
+      // Crear categoría personalizada si no existe
+      final newCategory = Category(
+        name: name, // CORRECCIÓN: El parámetro del constructor es 'name', no 'nombre'.
+        color: '#607D8B', // Color por defecto para categorías personalizadas
+        isPredefined: false, // CORRECCIÓN: El parámetro del constructor es 'isPredefined', no 'esPredefinida'.
+      );
+      final newId = await db.insert('categories', newCategory.toMap());
+      category = newCategory.copyWith(id: newId);
+    }
+    // Aseguramos que la categoría devuelta tenga un ID
+    // Si la categoría existía, ya tenía ID. Si se creó, se lo acabamos de asignar.
+    // El '!' es seguro aquí porque la lógica anterior garantiza que no será nulo.
+    return category!;
+  }
 }

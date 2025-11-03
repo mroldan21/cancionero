@@ -13,6 +13,22 @@ class Category {
     this.isPredefined = false,
   });
 
+  Category copyWith({
+    int? id,
+    String? name,
+    String? color,
+    int? order,
+    bool? isPredefined,
+  }) {
+    return Category(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      color: color ?? this.color,
+      order: order ?? this.order,
+      isPredefined: isPredefined ?? this.isPredefined,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,

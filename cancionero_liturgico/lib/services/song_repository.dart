@@ -311,4 +311,37 @@ class SongRepository {
       WHERE id = ?
     ''', [DateTime.now().toIso8601String(), songId]);
   }
+
+  // Nuevo método para obtener canciones modificadas después de una fecha (usado por SyncService)
+  Future<List<Song>> getModifiedSongsAfter(DateTime date) async {
+    final db = await _databaseHelper.database;
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT 
+        $_songColumns,
+        GROUP_CONCAT(cc.categoria_id) as categoria_ids
+      FROM songs s
+      LEFT JOIN cancion_categoria cc ON s.id = cc.cancion_id
+      WHERE s.fecha_modificacion > ?
+      GROUP BY s.id
+    ''', [date.toIso8601String()]);
+
+    List<Song> songs = [];
+    for (var map in maps) {
+      final song = Song.fromMap(map);
+      songs.add(song);
+    }
+    return songs;
+  }
+
+  // Nuevo método para verificar si una canción existe (usado por SyncService)
+  Future<bool> songExists(int songId) async {
+    final db = await _databaseHelper.database;
+    final result = await db.query(
+      'songs',
+      columns: ['id'],
+      where: 'id = ?',
+      whereArgs: [songId],
+    );
+    return result.isNotEmpty;
+  }
 }
