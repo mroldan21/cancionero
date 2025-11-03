@@ -1,6 +1,4 @@
 import 'package:cancionero_liturgico/models/song.dart';
-import 'package:cancionero_liturgico/models/setlist_model.dart';
-import 'package:cancionero_liturgico/models/setlist.dart'; // Importa SetlistItem
 import 'package:cancionero_liturgico/services/database_helper.dart';
 
 class SongRepository {
@@ -186,108 +184,6 @@ class SongRepository {
       whereArgs: [songId],
     );
     return maps.map((map) => map['categoria_id'] as int).toList();
-  }
-
-  Future<List<Setlist>> getAllSetlists() async {
-    print("[DEBUG] getAllSetlists: Iniciando obtención de setlists.");
-    final db = await _databaseHelper.database;
-    final List<Map<String, dynamic>> setlistMaps = await db.query('setlists', orderBy: 'nombre');
-    print("[DEBUG] getAllSetlists: Encontrados ${setlistMaps.length} setlists en la tabla 'setlists'.");
-
-    List<Setlist> setlists = [];
-    for (var setlistMap in setlistMaps) {
-      final setlist = Setlist.fromMap(setlistMap);
-      print("[DEBUG] getAllSetlists: Procesando setlist '${setlist.name}' (ID: ${setlist.id}).");
-
-      final songMaps = await db.query(
-        'setlist_cancion',
-        where: 'setlist_id = ?',
-        whereArgs: [setlist.id],
-        orderBy: 'orden ASC',
-      );
-      print("[DEBUG] getAllSetlists: Setlist '${setlist.name}' tiene ${songMaps.length} canciones asociadas.");
-
-      List<SetlistItem> setlistItems = [];
-      for (var songMap in songMaps) {
-        final songId = songMap['cancion_id'] as int;
-        final order = songMap['orden'] as int;
-        print("[DEBUG] getAllSetlists:   - Buscando canción con ID: $songId.");
-
-        // CORRECCIÓN: Usar una consulta que incluya los IDs de las categorías,
-        // igual que en getSongById, para que Song.fromMap funcione correctamente.
-        final songResult = await db.rawQuery('''
-          SELECT $_songColumns, GROUP_CONCAT(cc.categoria_id) as categoria_ids
-          FROM songs s
-          LEFT JOIN cancion_categoria cc ON s.id = cc.cancion_id
-          WHERE s.id = ?
-          GROUP BY s.id
-        ''', [songId]);
-        print("[DEBUG] getAllSetlists:   - Resultado de la consulta para la canción ID $songId: ${songResult.isNotEmpty ? 'Encontrada' : 'NO Encontrada'}.");
-
-        if (songResult.isNotEmpty) {
-          final song = Song.fromMap(songResult.first);
-          print("[DEBUG] getAllSetlists:   - SetlistItem para la canción '${song.title}' añadido correctamente.");
-          setlistItems.add(SetlistItem(
-            song: song,
-            order: order,
-          ));
-        } else {
-          print("[DEBUG] getAllSetlists:   - ¡ERROR! No se encontró la canción con ID: $songId en la tabla 'songs'. Este setlist podría estar incompleto.");
-        }
-      }
-      setlists.add(Setlist(
-        id: setlist.id,
-        name: setlist.name,
-        eventDate: setlist.eventDate,
-        notes: setlist.notes,
-        creationDate: setlist.creationDate,
-        modificationDate: setlist.modificationDate,
-        songs: setlistItems,
-      ));
-    }
-    print("[DEBUG] getAllSetlists: Finalizado. Devolviendo ${setlists.length} setlists completos.");
-    return setlists;
-  }
-
-  Future<void> insertSetlist(Setlist setlist) async {
-    final db = await _databaseHelper.database;
-    await db.transaction((txn) async {
-      final setlistId = await txn.insert('setlists', setlist.toMap());
-
-      for (int i = 0; i < setlist.songs.length; i++) {
-        final setlistItem = setlist.songs[i];
-        await txn.insert('setlist_cancion', {
-          'setlist_id': setlistId,
-          'cancion_id': setlistItem.song.id!,
-          'orden': i + 1,
-        });
-      }
-    });
-  }
-
-  Future<void> updateSetlist(Setlist setlist) async {
-    if (setlist.id == null) return;
-
-    final db = await _databaseHelper.database;
-    await db.transaction((txn) async {
-      await txn.update('setlists', setlist.toMap(), where: 'id = ?', whereArgs: [setlist.id]);
-
-      await txn.delete('setlist_cancion', where: 'setlist_id = ?', whereArgs: [setlist.id]);
-
-      for (int i = 0; i < setlist.songs.length; i++) {
-        final setlistItem = setlist.songs[i];
-        await txn.insert('setlist_cancion', {
-          'setlist_id': setlist.id,
-          'cancion_id': setlistItem.song.id!,
-          'orden': i + 1,
-        });
-      }
-    });
-  }
-
-  Future<void> deleteSetlist(int id) async {
-    final db = await _databaseHelper.database;
-    await db.delete('setlists', where: 'id = ?', whereArgs: [id]);
   }
 
   Future<void> toggleFavorite(int songId) async {

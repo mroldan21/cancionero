@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cancionero_liturgico/models/setlist_model.dart';
-import 'package:cancionero_liturgico/models/setlist.dart';
 import 'package:cancionero_liturgico/models/song.dart';
 import 'package:cancionero_liturgico/services/song_repository.dart';
+import 'package:cancionero_liturgico/services/setlist_repository.dart'; // 1. Importar el repositorio correcto
 import 'package:cancionero_liturgico/widgets/song_item.dart';
 
 class SetlistManagementScreen extends StatefulWidget {
@@ -62,7 +62,8 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
       return;
     }
 
-    final songRepository = Provider.of<SongRepository>(context, listen: false);
+    // 2. Obtener la instancia del repositorio de SETLISTS, no de canciones.
+    final setlistRepository = Provider.of<SetlistRepository>(context, listen: false);
     final setlist = Setlist(
       id: widget.setlist?.id, // Mantener ID si es edición
       name: _nameController.text,
@@ -73,10 +74,11 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
       songs: _selectedItems, // MEJORA: Usar la lista de SetlistItem que ya tiene el orden correcto
     );
 
+    // 3. Usar los métodos del repositorio de SETLISTS.
     if (widget.setlist?.id != null) {
-      await songRepository.updateSetlist(setlist);
+      await setlistRepository.updateSetlist(setlist);
     } else {
-      await songRepository.insertSetlist(setlist);
+      await setlistRepository.insertSetlist(setlist);
     }
     // Devolver 'true' para indicar que se guardaron cambios y la lista debe refrescarse.
     Navigator.pop(context, true);

@@ -6,10 +6,9 @@ import 'package:device_info_plus/device_info_plus.dart';
 import '../models/sync_models.dart';
 import '../models/song.dart';
 import '../models/category.dart'; // Asegúrate que este modelo exista y sea correcto
-import '../models/setlist_model.dart'; // CORRECCIÓN: Importar el modelo correcto para Setlist
+import '../models/setlist_model.dart';
 import './song_repository.dart';
 import './category_repository.dart';
-import '../models/setlist.dart'; // CORRECCIÓN: Importar el repositorio faltante
 import './setlist_repository.dart'; // CORRECCIÓN: Importar el repositorio faltante
 
 
@@ -114,6 +113,7 @@ class SyncService {
         print("SYNC_DEBUG: 2.1. 📄 Canción local modificada encontrada: '${cancion.title}' (ID: ${cancion.id})");
         // Determinar tipo de cambio
         String tipo = cancion.creationDate.isAfter(ultimaSync) ? 'crear' : 'actualizar';
+        print ("actualización de canción tipo: $tipo");
         // Convertir la canción a JSON para ser enviada
         final cancionJson = await _convertirCancionAJson(cancion);
         
@@ -125,9 +125,27 @@ class SyncService {
         ));
       }
       
-      // TODO: Recolectar cambios en setlists y categorías
-      // cambios.addAll(await _recolectarCambiosSetlists(ultimaSync));
-      // cambios.addAll(await _recolectarCambiosCategorias(ultimaSync));
+      
+      // Recolectar cambios en setlists
+      final setlistsLocales = await setlistRepository.getModifiedSetlistsAfter(ultimaSync);
+      for (final setlist in setlistsLocales) {
+        print("SYNC_DEBUG: 2.1. 📋 Setlist local modificado encontrado: '${setlist.name}' (ID: ${setlist.id})");
+        String tipo = setlist.creationDate.isAfter(ultimaSync) ? 'crear' : 'actualizar';
+        
+        // Aquí necesitaríamos una función para convertir el setlist a JSON.
+        // Por ahora, usamos el toMap() del modelo, asumiendo que es suficiente.
+        // En un siguiente paso podemos crear una función específica si es necesario.
+        final setlistJson = setlist.toMap();
+        setlistJson['canciones'] = setlist.songs.map((item) => {
+          'cancion_id': item.song.id,
+          'orden': item.order,
+          'transposicion_semitonos': item.transposition,
+          'capo_personalizado': item.capo,
+        }).toList();
+
+        cambios.add(CambioLocal(tipo: tipo, tabla: 'setlists', datos: setlistJson, timestamp: DateTime.now()));
+      }
+      // TODO: Recolectar cambios en categorías
       
       print("SYNC_DEBUG: 2.2. ✅ Total de cambios locales recolectados: ${cambios.length}");
       return cambios;
@@ -151,6 +169,9 @@ class SyncService {
         'cambios': cambios.map((c) => c.toJson()).toList(),
       }),
     );
+
+    // En _subirCambiosLocales, después de recibir los cambios:
+    //_debugCambiosLocales(cambios);
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -340,28 +361,65 @@ class SyncService {
     return hash.toString();
   }
 
-  Future<Map<String, dynamic>> _convertirCancionAJson(Song cancion) async {
-    // CORRECCIÓN: Mapear desde el modelo local (camelCase) a las claves del JSON (snake_case) que espera el servidor.
-    // Obtener los nombres de las categorías a partir de sus IDs
-    final categoryNames = await categoryRepository.getCategoryNamesByIds(cancion.categoryIds);
+  // Future<Map<String, dynamic>> _convertirCancionAJson(Song cancion) async {
+  //   // CORRECCIÓN REAL: Mapear desde el modelo local (camelCase) a las claves del JSON (snake_case) que espera el servidor.
+  //   final categoryNames = await categoryRepository.getCategoryNamesByIds(cancion.categoryIds);
 
-    return {
-      'id': cancion.id,
-      'titulo': cancion.title,
-      'autor': cancion.author,
-      'letra_con_acordes': cancion.content,
-      'tonalidad_original': cancion.originalKey,
-      'tempo_bpm': cancion.tempoBpm,
-      'posicion_capo': cancion.capoPosition,
-      'es_favorita': cancion.isFavorite ? 1 : 0,
-      'preferred_font_size': cancion.preferredFontSize,
-      'contador_reproducciones': cancion.playCount,
-      'fecha_creacion': cancion.creationDate.toIso8601String(),
-      'fecha_modificacion': cancion.modificationDate.toIso8601String(),
-      'notas': cancion.notes,
-      'enlaces_video': cancion.videoLinks != null ? json.encode(cancion.videoLinks) : null,
-      'categorias': categoryNames,
-    };
+  //   return {
+  //     'id': cancion.id,
+  //     'titulo': cancion.title,
+  //     'autor': cancion.author,
+  //     'letra_con_acordes': cancion.content,
+  //     'tonalidad_original': cancion.originalKey,
+  //     'tempo_bpm': cancion.tempoBpm,
+  //     'posicion_capo': cancion.capoPosition,
+  //     'es_favorita': cancion.isFavorite ? 1 : 0,
+  //     'fecha_creacion': cancion.creationDate.toIso8601String(),
+  //     'fecha_modificacion': cancion.modificationDate.toIso8601String(),
+  //     'notas': cancion.notes,
+  //     'enlaces_video': cancion.videoLinks?.join(','),
+  //     'preferred_font_size': cancion.preferredFontSize,
+  //     'contador_reproducciones': cancion.playCount,
+  //     'categorias': categoryNames,
+  //   };
+  // }
+
+  Future<Map<String, dynamic>> _convertirCancionAJson(Song cancion) async {
+  // Obtener nombres de categorías en lugar de IDs
+  final categoryNames = await categoryRepository.getCategoryNamesByIds(cancion.categoryIds);
+
+  return {
+    'id': cancion.id,
+    'titulo': cancion.title,
+    'autor': cancion.author ?? '',
+    'letra_con_acordes': cancion.content,
+    'tonalidad_original': cancion.originalKey,
+    'tempo_bpm': cancion.tempoBpm ?? 0,
+    'posicion_capo': cancion.capoPosition,
+    'es_favorita': cancion.isFavorite ? 1 : 0,
+    'fecha_creacion': cancion.creationDate.toIso8601String(),
+    'fecha_modificacion': cancion.modificationDate.toIso8601String(),
+    'notas': cancion.notes ?? '',
+    'enlaces_video': cancion.videoLinks != null && cancion.videoLinks!.isNotEmpty 
+        ? json.encode(cancion.videoLinks) 
+        : '[]',
+    'preferred_font_size': cancion.preferredFontSize.toString(),
+    'contador_reproducciones': cancion.playCount,
+    'categorias': categoryNames, // ← Ahora es un array, no string
+    'version': 1,
+    'estado': 'activo',
+  };
+}
+
+  // Método temporal para debuggear qué se está enviando
+  void _debugCambiosLocales(List<CambioLocal> cambios) {
+    print("SYNC_DEBUG: 📋 CONTENIDO DE LOS CAMBIOS A SUBIR:");
+    for (int i = 0; i < cambios.length; i++) {
+      final cambio = cambios[i];
+      print("SYNC_DEBUG:   Cambio $i - Tipo: ${cambio.tipo}, Tabla: ${cambio.tabla}");
+      print("SYNC_DEBUG:   Datos: ${json.encode(cambio.datos)}");
+      print("SYNC_DEBUG:   ---");
+    }
   }
 
   Future<void> _procesarCancionDescargada(Map<String, dynamic> cancionData) async {

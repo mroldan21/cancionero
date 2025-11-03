@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cancionero_liturgico/models/setlist_model.dart';
 import 'package:cancionero_liturgico/screens/song_detail_screen.dart';
-import 'package:cancionero_liturgico/services/song_repository.dart';
+import 'package:cancionero_liturgico/services/setlist_repository.dart';
 import 'package:cancionero_liturgico/screens/setlist_management_screen.dart';
 import 'package:cancionero_liturgico/services/song_provider.dart';
 
@@ -24,7 +24,7 @@ class _SetlistListScreenState extends State<SetlistListScreen> {
 
   void _loadSetlists() {
     setState(() {
-      _setlistsFuture = Provider.of<SongRepository>(context, listen: false).getAllSetlists();
+      _setlistsFuture = Provider.of<SetlistRepository>(context, listen: false).getAllSetlists();
     });
   }
 

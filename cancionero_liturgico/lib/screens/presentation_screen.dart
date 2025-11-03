@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:ui'; // For BackdropFilter
-import 'package:cancionero_liturgico/models/setlist.dart';
+import 'package:cancionero_liturgico/models/setlist_model.dart';
 
 import 'package:cancionero_liturgico/models/song.dart';
 import 'package:cancionero_liturgico/services/song_provider.dart';

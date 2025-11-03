@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cancionero_liturgico/models/song.dart';
-import 'package:cancionero_liturgico/models/setlist.dart'; // Importar SetlistItem
+import 'package:cancionero_liturgico/models/setlist_model.dart'; // SOLUCIÓN: Importar el modelo unificado
 import 'package:cancionero_liturgico/screens/presentation_screen.dart';
 import 'package:cancionero_liturgico/services/song_provider.dart'; // Importar SongProvider
 import 'package:cancionero_liturgico/services/transposition_service.dart';

@@ -1,5 +1,4 @@
 import 'package:cancionero_liturgico/models/setlist_model.dart';
-import 'package:cancionero_liturgico/models/setlist.dart';
 import 'package:cancionero_liturgico/models/song.dart';
 import 'package:cancionero_liturgico/services/database_helper.dart';
 
@@ -53,15 +52,7 @@ class SetlistRepository {
           ));
         }
       }
-      setlists.add(Setlist(
-        id: setlist.id,
-        name: setlist.name,
-        eventDate: setlist.eventDate,
-        notes: setlist.notes,
-        creationDate: setlist.creationDate,
-        modificationDate: setlist.modificationDate,
-        songs: setlistItems,
-      ));
+      setlists.add(setlist.copyWith(songs: setlistItems));
     }
     return setlists;
   }
@@ -108,7 +99,28 @@ class SetlistRepository {
     await db.delete('setlists', where: 'id = ?', whereArgs: [id]);
   }
 
-  // TODO: Implementar getModifiedSetlistsAfter para el SyncService
+  /// Busca en la base de datos todos los setlists que han sido modificados
+  /// después de la fecha proporcionada.
+  Future<List<Setlist>> getModifiedSetlistsAfter(DateTime date) async {
+    final db = await _databaseHelper.database;
+    // 1. Buscamos los IDs de los setlists cuya fecha de modificación es más reciente que la última sincronización.
+    final List<Map<String, dynamic>> setlistMaps = await db.query(
+      'setlists',
+      where: 'fecha_modificacion > ?',
+      whereArgs: [date.toUtc().toIso8601String()],
+    );
+
+    if (setlistMaps.isEmpty) {
+      return [];
+    }
+
+    // 2. Usamos la función existente `getAllSetlists` para obtener los objetos completos
+    // y luego filtramos solo los que encontramos en el paso anterior.
+    final allSetlists = await getAllSetlists();
+    final modifiedIds = setlistMaps.map((m) => m['id'] as int).toSet();
+    return allSetlists.where((s) => modifiedIds.contains(s.id)).toList();
+  }
+
   // TODO: Implementar getSetlistById para obtener un solo setlist
   // TODO: Implementar setlistExists para el SyncService
 }

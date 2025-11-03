@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:cancionero_liturgico/models/song.dart';
-import 'package:cancionero_liturgico/models/setlist.dart'; // Importa SetlistItem
+import 'package:cancionero_liturgico/models/setlist_model.dart'; // Importa SetlistItem
 import 'package:cancionero_liturgico/services/song_repository.dart'; // Import SongRepository
 
 class SongProvider with ChangeNotifier {
