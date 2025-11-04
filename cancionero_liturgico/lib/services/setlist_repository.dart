@@ -12,20 +12,29 @@ class SetlistRepository {
     s.fecha_creacion, s.fecha_modificacion, s.notas, s.enlaces_video, s.preferred_font_size
   ''';
 
+  
+  // En SetlistRepository, modifica getAllSetlists() con logging:
   Future<List<Setlist>> getAllSetlists() async {
     final db = await _databaseHelper.database;
+    print("SETLIST_DEBUG: 1. 📋 Obteniendo todos los setlists de la BD");
+    
     final List<Map<String, dynamic>> setlistMaps = await db.query('setlists', orderBy: 'nombre');
+    print("SETLIST_DEBUG: 2. 📊 Setlists encontrados en tabla: ${setlistMaps.length}");
 
     List<Setlist> setlists = [];
     for (var setlistMap in setlistMaps) {
       final setlist = Setlist.fromMap(setlistMap);
+      print("SETLIST_DEBUG: 3. 🔍 Procesando setlist: '${setlist.name}' (ID: ${setlist.id})");
 
+      // Obtener canciones del setlist
       final songMaps = await db.query(
         'setlist_cancion',
         where: 'setlist_id = ?',
         whereArgs: [setlist.id],
         orderBy: 'orden ASC',
       );
+      
+      print("SETLIST_DEBUG: 4. 🎵 Relaciones encontradas en setlist_cancion: ${songMaps.length}");
 
       List<SetlistItem> setlistItems = [];
       for (var songMap in songMaps) {
@@ -34,6 +43,9 @@ class SetlistRepository {
         final transposition = songMap['transposicion_semitonos'] as int? ?? 0;
         final capo = songMap['capo_personalizado'] as int?;
 
+        print("SETLIST_DEBUG: 5. 🔗 Relación - Canción ID: $songId, Orden: $order");
+
+        // Obtener canción
         final songResult = await db.rawQuery('''
           SELECT $_songColumns, GROUP_CONCAT(cc.categoria_id) as categoria_ids
           FROM songs s
@@ -50,48 +62,122 @@ class SetlistRepository {
             transposition: transposition,
             capo: capo,
           ));
+          print("SETLIST_DEBUG: 6. ✅ Canción agregada: '${song.title}'");
+        } else {
+          print("SETLIST_DEBUG: 6. ❌ Canción NO encontrada ID: $songId");
         }
       }
+      
       setlists.add(setlist.copyWith(songs: setlistItems));
+      print("SETLIST_DEBUG: 7. ✅ Setlist completado: '${setlist.name}' con ${setlistItems.length} canciones");
     }
+    
+    print("SETLIST_DEBUG: 8. 🏁 TOTAL setlists cargados: ${setlists.length}");
     return setlists;
   }
 
+  // Future<void> insertSetlist(Setlist setlist) async {
+  //   final db = await _databaseHelper.database;
+  //   print("SETLIST_DEBUG: 💾 INSERTANDO setlist: '${setlist.name}' con ${setlist.songs.length} canciones");
+  //   await db.transaction((txn) async {
+  //     final setlistId = await txn.insert('setlists', setlist.toMap());
+  //     print("SETLIST_DEBUG: ✅ Setlist insertado con ID: $setlistId");
+
+  //     for (final item in setlist.songs) {
+  //       print("SETLIST_DEBUG:   💾 Insertando relación - Canción: ${item.song.id}, Orden: ${item.order}");
+  //       await txn.insert('setlist_cancion', {
+  //         'setlist_id': setlistId,
+  //         'cancion_id': item.song.id!,
+  //         'orden': item.order,
+  //         'transposicion_semitonos': item.transposition,
+  //         'capo_personalizado': item.capo,
+  //       });
+  //     }
+  //     print("SETLIST_DEBUG: ✅ ${setlist.songs.length} relaciones insertadas");
+  //   });
+  // }
+
   Future<void> insertSetlist(Setlist setlist) async {
     final db = await _databaseHelper.database;
+    print("💾 INSERT SETLIST: '${setlist.name}' con ${setlist.songs.length} canciones");
+    
+    int? setlistIdFinal; // ← Variable para guardar el ID
+    
     await db.transaction((txn) async {
+      // 1. Insertar setlist
       final setlistId = await txn.insert('setlists', setlist.toMap());
-
+      setlistIdFinal = setlistId; // ← Guardar el ID
+      print("✅ Setlist insertado ID: $setlistId");
+      
+      // 2. Insertar cada relación
       for (final item in setlist.songs) {
-        await txn.insert('setlist_cancion', {
+        print("🔗 Insertando relación: Setlist $setlistId -> Canción ${item.song.id}, Orden ${item.order}");
+        
+        final result = await txn.insert('setlist_cancion', {
           'setlist_id': setlistId,
           'cancion_id': item.song.id!,
           'orden': item.order,
           'transposicion_semitonos': item.transposition,
           'capo_personalizado': item.capo,
         });
+        
+        print("✅ Relación insertada con ID: $result");
       }
+      
+      // 3. VERIFICAR que las relaciones se insertaron
+      final relacionesVerificadas = await txn.query('setlist_cancion', where: 'setlist_id = ?', whereArgs: [setlistId]);
+      print("🔍 VERIFICACIÓN: ${relacionesVerificadas.length} relaciones para setlist $setlistId");
     });
+    
+    // 4. VERIFICAR FUERA de la transacción - USAR setlistIdFinal
+    if (setlistIdFinal != null) {
+      final relacionesFinal = await db.query('setlist_cancion', where: 'setlist_id = ?', whereArgs: [setlistIdFinal]);
+      print("🏁 VERIFICACIÓN FINAL: ${relacionesFinal.length} relaciones persistentes para setlist $setlistIdFinal");
+    } else {
+      print("❌ ERROR: setlistIdFinal es null");
+    }
   }
 
   Future<void> updateSetlist(Setlist setlist) async {
     if (setlist.id == null) return;
 
     final db = await _databaseHelper.database;
+    print("💾 ACTUALIZANDO setlist: '${setlist.name}' con ${setlist.songs.length} canciones");
+    
     await db.transaction((txn) async {
+      // 1. Actualizar setlist
       await txn.update('setlists', setlist.toMap(), where: 'id = ?', whereArgs: [setlist.id]);
-      await txn.delete('setlist_cancion', where: 'setlist_id = ?', whereArgs: [setlist.id]);
-
+      print("✅ Setlist actualizado ID: ${setlist.id}");
+      
+      // 2. Eliminar relaciones existentes
+      final deletedCount = await txn.delete('setlist_cancion', where: 'setlist_id = ?', whereArgs: [setlist.id]);
+      print("🗑️  Relaciones eliminadas: $deletedCount");
+      
+      // 3. Insertar nuevas relaciones
+      int relacionesInsertadas = 0;
       for (final item in setlist.songs) {
-        await txn.insert('setlist_cancion', {
+        print("🔗 Insertando relación: Setlist ${setlist.id} -> Canción ${item.song.id}, Orden ${item.order}");
+        
+        final result = await txn.insert('setlist_cancion', {
           'setlist_id': setlist.id,
           'cancion_id': item.song.id!,
           'orden': item.order,
           'transposicion_semitonos': item.transposition,
           'capo_personalizado': item.capo,
         });
+        
+        print("✅ Relación insertada con ID: $result");
+        relacionesInsertadas++;
       }
+      
+      // 4. VERIFICAR dentro de la transacción
+      final relacionesVerificadas = await txn.query('setlist_cancion', where: 'setlist_id = ?', whereArgs: [setlist.id]);
+      print("🔍 VERIFICACIÓN: ${relacionesVerificadas.length} relaciones para setlist ${setlist.id}");
     });
+    
+    // 5. VERIFICAR FUERA de la transacción
+    final relacionesFinal = await db.query('setlist_cancion', where: 'setlist_id = ?', whereArgs: [setlist.id]);
+    print("🏁 VERIFICACIÓN FINAL: ${relacionesFinal.length} relaciones persistentes para setlist ${setlist.id}");
   }
 
   Future<void> deleteSetlist(int id) async {
@@ -101,15 +187,6 @@ class SetlistRepository {
 
   /// Busca en la base de datos todos los setlists que han sido modificados
   /// después de la fecha proporcionada.
-  // Future<List<Setlist>> getModifiedSetlistsAfter(DateTime date) async {
-  //   final db = await _databaseHelper.database;
-  //   // 1. Buscamos los IDs de los setlists cuya fecha de modificación es más reciente que la última sincronización.
-  //   final List<Map<String, dynamic>> setlistMaps = await db.query(
-  //     'setlists',
-  //     where: 'fecha_modificacion > ?',
-  //     whereArgs: [date.toUtc().toIso8601String()],
-  //   );
-
   Future<List<Setlist>> getModifiedSetlistsAfter(DateTime date) async {
     final db = await _databaseHelper.database;
     
@@ -192,16 +269,7 @@ class SetlistRepository {
     
     return setlists;
   }
-  //   if (setlistMaps.isEmpty) {
-  //     return [];
-  //   }
 
-  //   // 2. Usamos la función existente `getAllSetlists` para obtener los objetos completos
-  //   // y luego filtramos solo los que encontramos en el paso anterior.
-  //   final allSetlists = await getAllSetlists();
-  //   final modifiedIds = setlistMaps.map((m) => m['id'] as int).toSet();
-  //   return allSetlists.where((s) => modifiedIds.contains(s.id)).toList();
-  // }
 
   /// Obtiene un único setlist por su ID, incluyendo todas sus canciones.
   Future<Setlist?> getSetlistById(int id) async {

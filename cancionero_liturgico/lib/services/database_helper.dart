@@ -411,4 +411,40 @@ class DatabaseHelper {
     // Si no es una lista, intentar convertirlo a String
     return videoLinksData.toString();
   }
+
+  Future<void> debugBDCompleta() async {
+    final db = await database;
+    
+    print("=== 🔍 DEBUG COMPLETO BD LOCAL ===");
+    
+    // 1. Tabla setlists
+    final setlists = await db.query('setlists');
+    print("🗂️  SETLISTS (${setlists.length}):");
+    for (final s in setlists) {
+      print("   ID: ${s['id']}, Nombre: '${s['nombre']}'");
+    }
+    
+    // 2. Tabla setlist_cancion (CRÍTICO)
+    final relaciones = await db.query('setlist_cancion');
+    print("🔗 SETLIST_CANCION (${relaciones.length}):");
+    for (final r in relaciones) {
+      print("   ID: ${r['id']}, Setlist: ${r['setlist_id']}, Canción: ${r['cancion_id']}, Orden: ${r['orden']}");
+    }
+    
+    // 3. Tabla songs
+    final songs = await db.query('songs');
+    print("🎵 SONGS (${songs.length}):");
+    for (final s in songs) {
+      print("   ID: ${s['id']}, Título: '${s['titulo']}'");
+    }
+    
+    // 4. Tabla cancion_categoria
+    final categoriasRel = await db.query('cancion_categoria');
+    print("🏷️  CANCION_CATEGORIA (${categoriasRel.length}):");
+    for (final cr in categoriasRel) {
+      print("   Canción: ${cr['cancion_id']}, Categoría: ${cr['categoria_id']}");
+    }
+    
+    print("=== 🏁 FIN DEBUG ===");
+  }
 }

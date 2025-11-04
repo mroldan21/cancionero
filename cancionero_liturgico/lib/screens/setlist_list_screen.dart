@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/database_helper.dart';
 import 'package:cancionero_liturgico/models/setlist_model.dart';
 import 'package:cancionero_liturgico/screens/song_detail_screen.dart';
 import 'package:cancionero_liturgico/services/setlist_repository.dart';
@@ -20,12 +21,21 @@ class _SetlistListScreenState extends State<SetlistListScreen> {
   void initState() {
     super.initState();
     _loadSetlists();
+    _debugBD(); // Agrega esta línea
   }
 
   void _loadSetlists() {
     setState(() {
       _setlistsFuture = Provider.of<SetlistRepository>(context, listen: false).getAllSetlists();
     });
+  }
+
+  void _debugBD() async {
+    print("DEBUG: _debugBD() iniciado"); // ← Agrega esta línea
+    // Espera un poco para que la BD esté lista
+    await Future.delayed(Duration(milliseconds: 500));
+    final databaseHelper = DatabaseHelper();
+    await databaseHelper.debugBDCompleta();
   }
 
   Future<void> _navigateAndRefresh(Widget screen) async {
@@ -72,15 +82,15 @@ class _SetlistListScreenState extends State<SetlistListScreen> {
                 final setlist = setlists[index];
                 // SOLICITUD: Imprimir todos los parámetros del setlist para depuración.
                 print("""
-[DEBUG] SetlistListScreen build item:
-  - Setlist ID: ${setlist.id}
-  - Name: ${setlist.name}
-  - Event Date: ${setlist.eventDate?.toIso8601String()}
-  - Notes: ${setlist.notes}
-  - Song Count: ${setlist.songs.length}
-  - Creation Date: ${setlist.creationDate.toIso8601String()}
-  - Modification Date: ${setlist.modificationDate.toIso8601String()}
-"""); // Fin del print de depuración
+                  [DEBUG] SetlistListScreen build item:
+                    - Setlist ID: ${setlist.id}
+                    - Name: ${setlist.name}
+                    - Event Date: ${setlist.eventDate?.toIso8601String()}
+                    - Notes: ${setlist.notes}
+                    - Song Count: ${setlist.songs.length}
+                    - Creation Date: ${setlist.creationDate.toIso8601String()}
+                    - Modification Date: ${setlist.modificationDate.toIso8601String()}
+                  """); // Fin del print de depuración
                 return ListTile(
                   title: Text(setlist.name),
                   subtitle: Column(

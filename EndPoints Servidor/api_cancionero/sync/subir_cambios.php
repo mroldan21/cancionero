@@ -329,64 +329,6 @@ function actualizarCancion($db, $cancion_id, $datos, $hash) {
     return $cancion_id;
 }
 
-// function actualizarCancion($db, $cancion_id, $datos, $hash) {
-//     error_log("===== INICIO ACTUALIZAR CANCION ID: $cancion_id =====");
-    
-//     $query = "UPDATE songs SET
-//                 titulo = ?, autor = ?, letra_con_acordes = ?, tonalidad_original = ?,
-//                 tempo_bpm = ?, posicion_capo = ?, es_favorita = ?, preferred_font_size = ?,
-//                 notas = ?, enlaces_video = ?, hash_contenido = ?, version = version + 1,
-//                 fecha_modificacion = CURRENT_TIMESTAMP
-//               WHERE id = ?";
-
-//     $stmt = $db->prepare($query);
-//     $params = [
-//         $datos['titulo'],
-//         $datos['autor'] ?? null,
-//         $datos['letra_con_acordes'],
-//         $datos['tonalidad_original'],
-//         $datos['tempo_bpm'] ?? null,
-//         $datos['posicion_capo'] ?? 0,
-//         $datos['es_favorita'] ?? 0,
-//         $datos['preferred_font_size'] ?? 16.0,
-//         $datos['notas'] ?? null,
-//         $datos['enlaces_video'] ?? null,
-//         $hash,
-//         $cancion_id
-//     ];
-    
-//     error_log("Query: $query");
-//     error_log("Parámetros: " . json_encode($params));
-    
-//     $result = $stmt->execute($params);
-//     $rowCount = $stmt->rowCount();
-    
-//     error_log("Ejecución exitosa: " . ($result ? 'SÍ' : 'NO'));
-//     error_log("Filas afectadas: $rowCount");
-    
-//     if (!$result) {
-//         $errorInfo = $stmt->errorInfo();
-//         error_log("Error en actualización: " . json_encode($errorInfo));
-//     }
-
-//     // Actualizar categorías si se proporcionan
-//     if (isset($datos['categorias']) && !empty($datos['categorias'])) {
-//         error_log("Procesando categorías para canción ID: $cancion_id");
-        
-//         // Eliminar categorías existentes
-//         $queryDelete = "DELETE FROM cancion_categoria WHERE cancion_id = ?";
-//         $stmtDelete = $db->prepare($queryDelete);
-//         $deleteResult = $stmtDelete->execute([$cancion_id]);
-//         error_log("Categorías eliminadas: " . ($deleteResult ? 'SÍ' : 'NO'));
-        
-//         // Insertar nuevas categorías
-//         procesarCategoriasCancion($db, $cancion_id, $datos['categorias']);
-//     }
-    
-//     error_log("===== FIN ACTUALIZAR CANCION ID: $cancion_id =====");
-//     return $cancion_id;
-// }
-
 function procesarCategoriasCancion($db, $cancion_id, $categorias) {
     foreach ($categorias as $categoria_nombre) {
         // Buscar o crear categoría
@@ -423,14 +365,23 @@ function eliminarCancion($db, $datos) {
 // --- INICIO: Funciones para procesar Setlists ---
 
 function procesarSetlist($db, $datos, $tipo) {
-    error_log("===== INICIO PROCESAR SETLIST ID: {$datos['id']} (Tipo: $tipo) =====");
-    error_log("Datos recibidos para setlist: " . json_encode($datos));
+    error_log("====== 🎯 INICIO PROCESAR SETLIST ======");
+    error_log("📦 Datos COMPLETOS recibidos:");
+    error_log(json_encode($datos, JSON_PRETTY_PRINT));
+    error_log("🔧 Tipo: $tipo");
+    error_log("🆔 Setlist ID: {$datos['id']}");
+    error_log("📛 Nombre: {$datos['nombre']}");
+    error_log("📅 Fecha creación: {$datos['fecha_creacion']}");
+    error_log("📅 Fecha modificación: {$datos['fecha_modificacion']}");
+    error_log("🎵 Número de canciones: " . (isset($datos['canciones']) ? count($datos['canciones']) : 0));
 
     // VERIFICAR SI EL SETLIST EXISTE EN LA BD REMOTA
     $queryCheck = "SELECT id FROM setlists WHERE id = ?";
     $stmtCheck = $db->prepare($queryCheck);
     $stmtCheck->execute([$datos['id']]);
     $setlistExistente = $stmtCheck->fetch();
+
+    error_log($setlistExistente ? "✅ Setlist EXISTE en BD remota" : "❌ Setlist NO EXISTE en BD remota");
 
     if (!$setlistExistente) {
         // EL SETLIST NO EXISTE - CREARLO
