@@ -21,14 +21,14 @@ class _CategoriesScreenState extends State<CategoriesScreen> with SingleTickerPr
   late TabController _tabController;
   late Future<List<Category>> _allCategoriesFuture;
   late Future<List<Category>> _customCategoriesFuture;
-  late CategoryRepository categoryRepository;
-
+  
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() => setState(() {})); // Para reconstruir y actualizar el FAB
     _loadCategories();
+    //_refreshCategories(); 
     _debugCategorias();
   }
 
@@ -38,21 +38,23 @@ class _CategoriesScreenState extends State<CategoriesScreen> with SingleTickerPr
     _customCategoriesFuture = categoryRepository.getCustomCategories();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Aquí el context ya está disponible
+    _refreshCategories();
+  }
+
   void _debugCategorias() async {    
     await Future.delayed(Duration(milliseconds: 500));
     final categoryRepository = Provider.of<CategoryRepository>(context, listen: false);
     await categoryRepository.debugCategoriasConConteo();
   }
 
-  // void _refreshCategories() {
-  //   setState(() {
-  //     _loadCategories();
-  //   });
-  // }
-
   Future<void> _refreshCategories() async {
     print("🏷️ CATEGORIES SCREEN - Refrescando categorías");
     
+    final categoryRepository = Provider.of<CategoryRepository>(context, listen: false);
     setState(() {
       _allCategoriesFuture = categoryRepository.getAllCategories();
       _customCategoriesFuture = categoryRepository.getCustomCategories();

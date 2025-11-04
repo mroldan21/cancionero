@@ -17,8 +17,21 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
 
+  // final List<Widget> _screens = [
+  //   const CategoriesScreen(),
+  //   const SetlistListScreen(),
+  //   const FavoritesScreen(),
+  //   const SettingsScreen(),
+  // ];
+
+  // En main_navigation_screen.dart, reemplaza temporalmente:
   final List<Widget> _screens = [
-    const CategoriesScreen(),
+    Scaffold(  // ← Pantalla de prueba simple
+      body: Center(
+        child: Text("🎯 CATEGORÍAS DE PRUEBA", 
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+      ),
+    ),
     const SetlistListScreen(),
     const FavoritesScreen(),
     const SettingsScreen(),
@@ -44,14 +57,26 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   @override
   Widget build(BuildContext context) {
     print("[SCREEN] Build: MainNavigationScreen");
+    print("🏠 MAIN NAVIGATION - Índice actual: $_selectedIndex");
+    print("📱 MAIN NAVIGATION - Número de screens: ${_screens.length}");
+  
+    for (int i = 0; i < _screens.length; i++) {
+      print("   - Índice $i: ${_screens[i].runtimeType}");
+    }
+
+    // TEMPORAL: Forzar CategoriesScreen para debug
+    Widget forcedBody = _screens[0]; // Siempre mostrar CategoriesScreen
+    print("🎯 TEMPORAL: Forzando pantalla: ${forcedBody.runtimeType}");
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_titles[_selectedIndex]),
       ),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
-      ),
+      body: forcedBody,
+      // body: IndexedStack(
+      //   index: _selectedIndex,
+      //   children: _screens,
+      // ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         items: const [
