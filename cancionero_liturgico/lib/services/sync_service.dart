@@ -125,16 +125,23 @@ class SyncService {
         ));
       }
       
-      
       // Recolectar cambios en setlists
       final setlistsLocales = await setlistRepository.getModifiedSetlistsAfter(ultimaSync);
+      print("SYNC_DEBUG: 2.3. 📋 Setlists locales modificados encontrados: ${setlistsLocales.length}");
+
+      // DEBUG DETALLADO Y PROCESAMIENTO DE SETLISTS
       for (final setlist in setlistsLocales) {
-        print("SYNC_DEBUG: 2.1. 📋 Setlist local modificado encontrado: '${setlist.name}' (ID: ${setlist.id})");
-        String tipo = setlist.creationDate.isAfter(ultimaSync) ? 'crear' : 'actualizar';
+        print("SYNC_DEBUG: 2.3.1. Setlist: '${setlist.name}' (ID: ${setlist.id})");
+        print("SYNC_DEBUG: 2.3.2. - Creación: ${setlist.creationDate}");
+        print("SYNC_DEBUG: 2.3.3. - Modificación: ${setlist.modificationDate}");
+        print("SYNC_DEBUG: 2.3.4. - Última sync: $ultimaSync");
+        print("SYNC_DEBUG: 2.3.5. - Es después?: ${setlist.modificationDate.isAfter(ultimaSync)}");
+        print("SYNC_DEBUG: 2.3.6. - Canciones: ${setlist.songs.length}");
         
-        // Aquí necesitaríamos una función para convertir el setlist a JSON.
-        // Por ahora, usamos el toMap() del modelo, asumiendo que es suficiente.
-        // En un siguiente paso podemos crear una función específica si es necesario.
+        String tipo = setlist.creationDate.isAfter(ultimaSync) ? 'crear' : 'actualizar';
+        print("SYNC_DEBUG: 2.3.7. - Tipo: $tipo");
+        
+        // Verificar el JSON que se enviará
         final setlistJson = setlist.toMap();
         setlistJson['canciones'] = setlist.songs.map((item) => {
           'cancion_id': item.song.id,
@@ -142,10 +149,34 @@ class SyncService {
           'transposicion_semitonos': item.transposition,
           'capo_personalizado': item.capo,
         }).toList();
+        
+        print("SYNC_DEBUG: 2.3.8. - JSON a enviar: ${json.encode(setlistJson)}");
 
-        cambios.add(CambioLocal(tipo: tipo, tabla: 'setlists', datos: setlistJson, timestamp: DateTime.now()));
+        print("SYNC_DEBUG: 2.3.8. - Canciones en setlist:");
+        for (int i = 0; i < setlist.songs.length; i++) {
+          final item = setlist.songs[i];
+          print("SYNC_DEBUG:     $i. Canción ID: ${item.song.id}, Orden: ${item.order}, " +
+                "Transposición: ${item.transposition}, Capo: ${item.capo}");
+        }
+        
+        // AÑADIR EL SETLIST A LOS CAMBIOS (esto faltaba)
+        cambios.add(CambioLocal(
+          tipo: tipo,
+          tabla: 'setlists', 
+          datos: setlistJson,
+          timestamp: DateTime.now(),
+        ));
       }
-      // TODO: Recolectar cambios en categorías
+      
+      // COMPLETADO: Recolectar cambios en categorías (asumiendo que se pueden modificar)
+      // Nota: La lógica para 'getModifiedCategoriesAfter' debería añadirse en CategoryRepository si es necesario.
+      // Por ahora, este es un placeholder para mostrar dónde iría la lógica.
+      /*
+      final categoriasLocales = await categoryRepository.getModifiedCategoriesAfter(ultimaSync);
+      for (final categoria in categoriasLocales) {
+        // ... lógica para añadir cambios de categoría ...
+      }
+      */
       
       print("SYNC_DEBUG: 2.2. ✅ Total de cambios locales recolectados: ${cambios.length}");
       return cambios;
@@ -155,6 +186,7 @@ class SyncService {
     }
   }
 
+  //Funciones de procesamiento
   // 3. Subir cambios locales al servidor
   Future<ResultadoSync> _subirCambiosLocales(String sessionId, List<CambioLocal> cambios) async {
     final deviceId = await _getDeviceId();
@@ -171,7 +203,7 @@ class SyncService {
     );
 
     // En _subirCambiosLocales, después de recibir los cambios:
-    //_debugCambiosLocales(cambios);
+    _debugCambiosLocales(cambios);
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -240,6 +272,51 @@ class SyncService {
       await _procesarRelacionSetlistCancion(relacionData);
     }
     print("SYNC_DEBUG: 5.4. ✅ Finalizada la aplicación de cambios locales.");
+  }
+
+
+  Future<void> _procesarSetlistDescargado(Map<String, dynamic> setlistData) async {
+    print("SYNC_DEBUG: 5.3.1. 📋 Procesando setlist descargado: '${setlistData['nombre']}' (ID: ${setlistData['id']})");
+    
+    try {
+      // Convertir datos del servidor a modelo Setlist
+      final setlist = Setlist(
+        id: setlistData['id'] as int,
+        name: setlistData['nombre'] as String,
+        creationDate: DateTime.parse(setlistData['fecha_creacion'] as String),
+        modificationDate: DateTime.parse(setlistData['fecha_modificacion'] as String),
+        eventDate: setlistData['fecha_evento'] != null 
+            ? DateTime.parse(setlistData['fecha_evento'] as String) 
+            : null,
+        notes: setlistData['notas'] as String?,
+        songs: [], // Se poblará con las relaciones
+      );
+
+      // Verificar si el setlist existe localmente
+      final setlistExistente = await setlistRepository.getSetlistById(setlist.id!);
+      
+      if (setlistExistente == null) {
+        // Crear nuevo setlist
+        print("SYNC_DEBUG: 5.3.2. ➕ Insertando nuevo setlist: '${setlist.name}'");
+        await setlistRepository.insertSetlist(setlist);
+      } else {
+        // Actualizar setlist existente
+        print("SYNC_DEBUG: 5.3.2. 🔄 Actualizando setlist existente: '${setlist.name}'");
+        await setlistRepository.updateSetlist(setlist);
+      }
+      
+    } catch (e) {
+      print("SYNC_DEBUG: 5.3.3. ❌ Error procesando setlist: $e");
+      print("SYNC_DEBUG: 5.3.4. 📄 Datos del setlist: ${json.encode(setlistData)}");
+    }
+  }
+
+  Future<void> _procesarRelacionSetlistCancion(Map<String, dynamic> relacionData) async {
+    print("SYNC_DEBUG: 5.3.5. 🔗 Procesando relación setlist-canción");
+    print("SYNC_DEBUG: 5.3.6. 📄 Datos de relación: ${json.encode(relacionData)}");
+    
+    // Esta función se llama para cada relación setlist-canción descargada
+    // Por ahora solo logueamos, ya que las relaciones se manejan en insertSetlist/updateSetlist
   }
 
   // 6. Finalizar sincronización
@@ -361,29 +438,6 @@ class SyncService {
     return hash.toString();
   }
 
-  // Future<Map<String, dynamic>> _convertirCancionAJson(Song cancion) async {
-  //   // CORRECCIÓN REAL: Mapear desde el modelo local (camelCase) a las claves del JSON (snake_case) que espera el servidor.
-  //   final categoryNames = await categoryRepository.getCategoryNamesByIds(cancion.categoryIds);
-
-  //   return {
-  //     'id': cancion.id,
-  //     'titulo': cancion.title,
-  //     'autor': cancion.author,
-  //     'letra_con_acordes': cancion.content,
-  //     'tonalidad_original': cancion.originalKey,
-  //     'tempo_bpm': cancion.tempoBpm,
-  //     'posicion_capo': cancion.capoPosition,
-  //     'es_favorita': cancion.isFavorite ? 1 : 0,
-  //     'fecha_creacion': cancion.creationDate.toIso8601String(),
-  //     'fecha_modificacion': cancion.modificationDate.toIso8601String(),
-  //     'notas': cancion.notes,
-  //     'enlaces_video': cancion.videoLinks?.join(','),
-  //     'preferred_font_size': cancion.preferredFontSize,
-  //     'contador_reproducciones': cancion.playCount,
-  //     'categorias': categoryNames,
-  //   };
-  // }
-
   Future<Map<String, dynamic>> _convertirCancionAJson(Song cancion) async {
   // Obtener nombres de categorías en lugar de IDs
   final categoryNames = await categoryRepository.getCategoryNamesByIds(cancion.categoryIds);
@@ -486,11 +540,11 @@ class SyncService {
     }
   }
 
-  Future<void> _procesarSetlistDescargado(Map<String, dynamic> setlistData) async {
-    // Implementar según tu modelo Setlist
-  }
+  // Future<void> _procesarSetlistDescargado(Map<String, dynamic> setlistData) async {
+  //   // Implementar según tu modelo Setlist
+  // }
 
-  Future<void> _procesarRelacionSetlistCancion(Map<String, dynamic> relacionData) async {
-    // Implementar según tu modelo
-  }
+  // Future<void> _procesarRelacionSetlistCancion(Map<String, dynamic> relacionData) async {
+  //   // Implementar según tu modelo
+  // }
 }

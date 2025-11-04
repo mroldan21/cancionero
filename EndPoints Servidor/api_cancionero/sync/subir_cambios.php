@@ -36,11 +36,15 @@ try {
 
     $database = new Database();
     $db = $database->getConnection();
+    $db->exec("SET time_zone = '-03:00'");
 
     $resultados = [
         'canciones_creadas' => 0,
         'canciones_actualizadas' => 0,
         'canciones_eliminadas' => 0,
+        'setlists_creados' => 0,
+        'setlists_actualizados' => 0,
+        'setlists_eliminados' => 0,
         'errores' => []
     ];
 
@@ -70,6 +74,16 @@ try {
                                 error_log("📊 Contador: Canción actualizada - ID: {$datos['id']}");
                             }
                         }
+                    } elseif ($tabla === 'setlists') {
+                        // COMPLETADO: Procesar la subida de setlists
+                        $resultado = procesarSetlist($db, $datos, $tipo);
+                        if ($tipo === 'crear') {
+                            $resultados['setlists_creados']++;
+                            error_log("📊 Contador: Setlist creado - ID: {$datos['id']}");
+                        } else {
+                            $resultados['setlists_actualizados']++;
+                            error_log("📊 Contador: Setlist actualizado - ID: {$datos['id']}");
+                        }
                     }
                     break;
 
@@ -77,6 +91,9 @@ try {
                     if ($tabla === 'songs') {
                         $resultado = eliminarCancion($db, $datos);
                         $resultados['canciones_eliminadas']++;
+                    } elseif ($tabla === 'setlists') {
+                        $resultado = eliminarSetlist($db, $datos);
+                        $resultados['setlists_eliminados']++;
                     }
                     break;
             }
@@ -402,4 +419,184 @@ function eliminarCancion($db, $datos) {
     $stmt->execute([$datos['id']]);
     return $stmt->rowCount();
 }
+
+// --- INICIO: Funciones para procesar Setlists ---
+
+function procesarSetlist($db, $datos, $tipo) {
+    error_log("===== INICIO PROCESAR SETLIST ID: {$datos['id']} (Tipo: $tipo) =====");
+    error_log("Datos recibidos para setlist: " . json_encode($datos));
+
+    // VERIFICAR SI EL SETLIST EXISTE EN LA BD REMOTA
+    $queryCheck = "SELECT id FROM setlists WHERE id = ?";
+    $stmtCheck = $db->prepare($queryCheck);
+    $stmtCheck->execute([$datos['id']]);
+    $setlistExistente = $stmtCheck->fetch();
+
+    if (!$setlistExistente) {
+        // EL SETLIST NO EXISTE - CREARLO
+        error_log("Setlist ID {$datos['id']} no existe en BD remota. Creándolo...");
+        return crearSetlistConId($db, $datos);
+    } else {
+        // EL SETLIST EXISTE - ACTUALIZARLO
+        error_log("Setlist ID {$datos['id']} existe en BD remota. Actualizándolo...");
+        return actualizarSetlist($db, $datos['id'], $datos);
+    }
+}
+
+// FUNCIÓN MEJORADA: Crear setlist con ID específico
+function crearSetlistConId($db, $datos) {
+    $query = "INSERT INTO setlists (id, nombre, fecha_evento, notas, fecha_creacion, fecha_modificacion) 
+              VALUES (?, ?, ?, ?, ?, ?)";
+    $stmt = $db->prepare($query);
+    $result = $stmt->execute([
+        $datos['id'], // Usar el ID que viene de Flutter
+        $datos['nombre'],
+        $datos['fecha_evento'] ?? null,
+        $datos['notas'] ?? null,
+        $datos['fecha_creacion'],
+        $datos['fecha_modificacion']
+    ]);
+
+    if ($result) {
+        $setlist_id = $datos['id'];
+        error_log("✅ Setlist creado exitosamente con ID: $setlist_id");
+
+        // Procesar canciones del setlist
+        procesarCancionesSetlist($db, $setlist_id, $datos['canciones'] ?? []);
+        
+        return $setlist_id;
+    } else {
+        $errorInfo = $stmt->errorInfo();
+        error_log("❌ Error creando setlist: " . json_encode($errorInfo));
+        throw new Exception("Error al crear setlist: " . $errorInfo[2]);
+    }
+}
+
+// FUNCIÓN MEJORADA: Actualizar setlist existente
+function actualizarSetlist($db, $setlist_id, $datos) {
+    $query = "UPDATE setlists SET 
+                nombre = ?, fecha_evento = ?, notas = ?, fecha_modificacion = ?
+              WHERE id = ?";
+    $stmt = $db->prepare($query);
+    $result = $stmt->execute([
+        $datos['nombre'],
+        $datos['fecha_evento'] ?? null,
+        $datos['notas'] ?? null,
+        $datos['fecha_modificacion'],
+        $setlist_id
+    ]);
+
+    if ($result) {
+        $rowCount = $stmt->rowCount();
+        if ($rowCount > 0) {
+            error_log("✅ Setlist ID $setlist_id actualizado exitosamente (filas afectadas: $rowCount)");
+        } else {
+            error_log("⚠️  Setlist ID $setlist_id no se actualizó (posiblemente sin cambios)");
+        }
+        
+        // Procesar canciones del setlist (siempre actualizar las relaciones)
+        procesarCancionesSetlist($db, $setlist_id, $datos['canciones'] ?? []);
+        
+    } else {
+        $errorInfo = $stmt->errorInfo();
+        error_log("❌ Error actualizando setlist: " . json_encode($errorInfo));
+        throw new Exception("Error al actualizar setlist: " . $errorInfo[2]);
+    }
+
+    return $setlist_id;
+}
+
+// FUNCIÓN MEJORADA: Procesar canciones del setlist
+function procesarCancionesSetlist($db, $setlist_id, $canciones) {
+    error_log("🔄 Procesando " . count($canciones) . " canciones para setlist ID: $setlist_id");
+    
+    // DEBUG: Log detallado de cada canción recibida
+    foreach ($canciones as $index => $cancionItem) {
+        error_log("🎵 Canción $index: " . json_encode($cancionItem));
+    }
+
+    if (empty($canciones)) {
+        error_log("ℹ️  No hay canciones para procesar en setlist ID: $setlist_id");
+        return;
+    }
+
+    // 1. Borramos las asociaciones existentes
+    $queryDelete = "DELETE FROM setlist_cancion WHERE setlist_id = ?";
+    $stmtDelete = $db->prepare($queryDelete);
+    $deleteResult = $stmtDelete->execute([$setlist_id]);
+    $deletedRows = $stmtDelete->rowCount();
+    error_log("🗑️  Relaciones antiguas eliminadas: $deletedRows filas");
+
+    // 2. Insertamos las nuevas asociaciones
+    $queryInsert = "INSERT INTO setlist_cancion 
+                    (setlist_id, cancion_id, orden, transposicion_semitonos, capo_personalizado) 
+                    VALUES (?, ?, ?, ?, ?)";
+    $stmtInsert = $db->prepare($queryInsert);
+
+    $insertCount = 0;
+    $errors = 0;
+    
+    foreach ($canciones as $index => $cancionItem) {
+        try {
+            // Validación más estricta
+            if (!isset($cancionItem['cancion_id']) || !isset($cancionItem['orden'])) {
+                error_log("❌ Canción en índice $index falta datos requeridos: " . json_encode($cancionItem));
+                $errors++;
+                continue;
+            }
+            
+            // Validar que cancion_id sea numérico y mayor a 0
+            $cancion_id = $cancionItem['cancion_id'];
+            if (!is_numeric($cancion_id) || $cancion_id <= 0) {
+                error_log("❌ Canción ID inválido en índice $index: $cancion_id");
+                $errors++;
+                continue;
+            }
+            
+            $result = $stmtInsert->execute([
+                $setlist_id,
+                $cancion_id,
+                $cancionItem['orden'],
+                $cancionItem['transposicion_semitonos'] ?? 0,
+                $cancionItem['capo_personalizado'] ?? null
+            ]);
+            
+            if ($result) {
+                $insertCount++;
+                error_log("✅ Canción $cancion_id insertada correctamente (orden: {$cancionItem['orden']})");
+            } else {
+                $errorInfo = $stmtInsert->errorInfo();
+                error_log("❌ Error insertando canción $cancion_id: " . json_encode($errorInfo));
+                $errors++;
+            }
+            
+        } catch (Exception $e) {
+            error_log("❌ Excepción insertando canción {$cancionItem['cancion_id']}: " . $e->getMessage());
+            $errors++;
+        }
+    }
+    
+    error_log("🎯 RESUMEN Setlist $setlist_id: $insertCount insertadas, $errors errores de " . count($canciones) . " canciones");
+}
+
+// FUNCIÓN ELIMINAR SETLIST (MANTENER ESTA FUNCIÓN)
+function eliminarSetlist($db, $datos) {
+    error_log("===== ELIMINANDO SETLIST ID: {$datos['id']} =====");
+    
+    // La eliminación en cascada (ON DELETE CASCADE) se encargará de la tabla `setlist_cancion`
+    $query = "DELETE FROM setlists WHERE id = ?";
+    $stmt = $db->prepare($query);
+    $result = $stmt->execute([$datos['id']]);
+    $rowCount = $stmt->rowCount();
+    
+    if ($result && $rowCount > 0) {
+        error_log("✅ Setlist ID {$datos['id']} eliminado exitosamente");
+    } else {
+        error_log("⚠️  Setlist ID {$datos['id']} no se pudo eliminar o no existía");
+    }
+    
+    return $rowCount;
+}
+
+// --- FIN: Funciones para procesar Setlists ---
 ?>

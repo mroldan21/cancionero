@@ -333,7 +333,22 @@ class _CategoryListViewState extends State<_CategoryListView> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      // SOLICITUD: Mostrar un ícono grande en el centro durante la carga.
+      return Center(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            SizedBox(
+              width: 100,
+              height: 100,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+              ),
+            ),
+            Icon(Icons.sync, size: 60, color: Theme.of(context).colorScheme.primary),
+          ],
+        ),
+      );
     }
 
     if (_categories.isEmpty && widget.reorderable) {

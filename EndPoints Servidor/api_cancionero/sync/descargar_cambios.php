@@ -25,6 +25,7 @@ try {
 
     $database = new Database();
     $db = $database->getConnection();
+    $db->exec("SET time_zone = '-03:00'");
 
     // Obtener canciones modificadas/creadas después de la última sync
     // Consulta CORREGIDA - usando nombres exactos de Flutter

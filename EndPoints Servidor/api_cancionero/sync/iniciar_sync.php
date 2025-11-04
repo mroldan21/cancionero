@@ -25,6 +25,9 @@ try {
 
     $database = new Database();
     $db = $database->getConnection();
+    
+    // En config/database.php o similar, después de la conexión:
+    $db->exec("SET time_zone = '-03:00'");
 
     // Registrar inicio de sincronización
     $query = "INSERT INTO dispositivos_sincronizacion 

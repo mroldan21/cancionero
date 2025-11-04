@@ -47,7 +47,21 @@ class _SetlistListScreenState extends State<SetlistListScreen> {
         future: _setlistsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            // SOLICITUD: Reemplazar el indicador de carga simple por uno grande y centrado.
+            return Center(
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  SizedBox(
+                    width: 100,
+                    height: 100,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  Icon(Icons.sync,
+                      size: 60, color: Theme.of(context).colorScheme.primary),
+                ],
+              ),
+            );
           } else if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
           } else {
