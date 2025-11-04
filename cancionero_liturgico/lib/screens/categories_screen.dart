@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/category_repository.dart';
 import 'package:cancionero_liturgico/models/category.dart';
 import 'package:cancionero_liturgico/models/song.dart';
 import 'package:cancionero_liturgico/services/category_repository.dart';
@@ -20,6 +21,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> with SingleTickerPr
   late TabController _tabController;
   late Future<List<Category>> _allCategoriesFuture;
   late Future<List<Category>> _customCategoriesFuture;
+  late CategoryRepository categoryRepository;
 
   @override
   void initState() {
@@ -27,6 +29,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> with SingleTickerPr
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() => setState(() {})); // Para reconstruir y actualizar el FAB
     _loadCategories();
+    _debugCategorias();
   }
 
   void _loadCategories() {
@@ -35,10 +38,36 @@ class _CategoriesScreenState extends State<CategoriesScreen> with SingleTickerPr
     _customCategoriesFuture = categoryRepository.getCustomCategories();
   }
 
-  void _refreshCategories() {
+  void _debugCategorias() async {    
+    await Future.delayed(Duration(milliseconds: 500));
+    final categoryRepository = Provider.of<CategoryRepository>(context, listen: false);
+    await categoryRepository.debugCategoriasConConteo();
+  }
+
+  // void _refreshCategories() {
+  //   setState(() {
+  //     _loadCategories();
+  //   });
+  // }
+
+  Future<void> _refreshCategories() async {
+    print("🏷️ CATEGORIES SCREEN - Refrescando categorías");
+    
     setState(() {
-      _loadCategories();
+      _allCategoriesFuture = categoryRepository.getAllCategories();
+      _customCategoriesFuture = categoryRepository.getCustomCategories();
     });
+    
+    // DEBUG: Ver qué categorías se están cargando
+    final allCats = await _allCategoriesFuture;
+    final customCats = await _customCategoriesFuture;
+    
+    print("🏷️ CATEGORIES SCREEN - ${allCats.length} categorías totales");
+    print("🏷️ CATEGORIES SCREEN - ${customCats.length} categorías personalizadas");
+    
+    for (final category in allCats) {
+      print("   - '${category.name}' (ID: ${category.id})");
+    }
   }
 
   @override
@@ -49,6 +78,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
+    print("🏷️ CATEGORIES SCREEN - Build ejecutado");
     return Scaffold(
       appBar: AppBar(
         title: const Text('Organización por Categorías'),

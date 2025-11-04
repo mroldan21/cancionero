@@ -141,9 +141,13 @@ class SongRepository {
 
   Future<int> insertSong(Song song) async {
     final db = await _databaseHelper.database;
+    print("🎵 INSERT SONG: '${song.title}' con ${song.categoryIds.length} categorías");
     final int songId = await db.transaction((txn) async {
       return await txn.insert('songs', song.toMap());
     });
+    // Debug de categorías después de insertar
+    final categoriasDebug = await db.query('cancion_categoria', where: 'cancion_id = ?', whereArgs: [songId]);
+    print("🏷️  RELACIONES CREADAS: ${categoriasDebug.length} para canción $songId");
     return songId;
   }
 

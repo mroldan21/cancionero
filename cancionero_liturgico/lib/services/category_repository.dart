@@ -156,4 +156,21 @@ class CategoryRepository {
     // El '!' es seguro aquí porque la lógica anterior garantiza que no será nulo.
     return category!;
   }
+
+  Future<void> debugCategoriasConConteo() async {
+    final db = await _databaseHelper.database;
+    
+    final categorias = await db.query('categories');
+    print("🏷️  DEBUG CATEGORÍAS CON CONTEO:");
+    
+    for (final categoria in categorias) {
+      final relaciones = await db.query(
+        'cancion_categoria', 
+        where: 'categoria_id = ?', 
+        whereArgs: [categoria['id']]
+      );
+      
+      print("   - '${categoria['nombre']}' (ID: ${categoria['id']}): ${relaciones.length} canciones");
+    }
+  }
 }
