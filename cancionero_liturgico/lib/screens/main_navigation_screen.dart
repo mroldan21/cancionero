@@ -31,16 +31,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     'Ajustes',
   ];
 
-  void _debugCategorias() async {
-    final databaseHelper = DatabaseHelper();
-    await databaseHelper.debugBDCompleta();
-    
-    // También debug específico de categorías si tienes el método
-    final categoryRepository = Provider.of<CategoryRepository>(context, listen: false);
-    // Si tienes el método debugCategoriasConConteo, descomenta:
-    // await categoryRepository.debugCategoriasConConteo();
-  }
-
   @override
   Widget build(BuildContext context) {
     print("[SCREEN] Build: MainNavigationScreen");
@@ -69,11 +59,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             _selectedIndex = index;
           });
         },
-      ),      
-      floatingActionButton: FloatingActionButton(
-        onPressed: _debugCategorias,
-        child: Icon(Icons.bug_report),
-        backgroundColor: Colors.red,
       ),
     );
   }

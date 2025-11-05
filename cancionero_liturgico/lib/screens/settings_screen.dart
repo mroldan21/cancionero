@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cancionero_liturgico/widgets/sync_button.dart';
 import 'package:cancionero_liturgico/services/theme_provider.dart';
+import 'package:cancionero_liturgico/services/database_helper.dart';
+import 'package:cancionero_liturgico/services/category_repository.dart';
 // import 'package:file_picker/file_picker.dart'; // Ya no se necesita
 // import 'dart:convert'; // Ya no se necesita
 // import 'dart:io'; // Ya no se necesita
@@ -172,6 +174,28 @@ class SettingsScreen extends StatelessWidget {
           //     await _importarDatosPrueba(context, songRepository);
           //   },
           // ),
+
+          // --- Sección Debug ---
+          const Divider(),
+          const ListTile(title: Text('DEBUG', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red))),
+          ListTile(
+            leading: const Icon(Icons.bug_report, color: Colors.red),
+            title: const Text('Ejecutar Debug de BD Completa', style: TextStyle(color: Colors.red)),
+            onTap: () async {
+              final databaseHelper = DatabaseHelper();
+              await databaseHelper.debugBDCompleta();
+
+              final categoryRepository = Provider.of<CategoryRepository>(context, listen: false);
+              await categoryRepository.debugCategoriasConConteo();
+
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Debug de BD ejecutado. Revisa la consola.'), backgroundColor: Colors.green),
+                );
+              }
+              print("--- DEBUG EJECUTADO DESDE AJUSTES ---");
+            },
+          ),
         ],
       ),
     );
