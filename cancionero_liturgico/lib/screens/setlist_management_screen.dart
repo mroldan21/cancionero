@@ -84,6 +84,46 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
     Navigator.pop(context, true);
   }
 
+  // SOLICITUD: Añadir método para confirmar y eliminar el setlist.
+  Future<void> _confirmDeleteSetlist() async {
+    // Asegurarse de que estamos editando un setlist existente.
+    if (widget.setlist == null || widget.setlist!.id == null) return;
+
+    final bool? shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Confirmar Eliminación'),
+          content: Text(
+              '¿Estás seguro de que quieres eliminar el setlist "${widget.setlist!.name}"? Las canciones asignadas se desvincularán, pero no se eliminarán de tu repertorio. Esta acción no se puede deshacer.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancelar'),
+              onPressed: () {
+                Navigator.of(context).pop(false); // No eliminar.
+              },
+            ),
+            TextButton(
+              child: const Text('Eliminar', style: TextStyle(color: Colors.red)),
+              onPressed: () {
+                Navigator.of(context).pop(true); // Confirmar eliminación.
+              },
+            ),
+          ],
+        );
+      },
+    );
+
+    // Si el usuario confirmó la eliminación, proceder.
+    if (shouldDelete == true && context.mounted) {
+      final setlistRepository = Provider.of<SetlistRepository>(context, listen: false);
+      await setlistRepository.deleteSetlist(widget.setlist!.id!);
+
+      // Volver a la pantalla anterior indicando que se realizaron cambios.
+      Navigator.of(context).pop(true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     print("[SCREEN] Build: SetlistManagementScreen");
@@ -94,6 +134,13 @@ class _SetlistManagementScreenState extends State<SetlistManagementScreen> {
           IconButton(
             icon: const Icon(Icons.save),
             onPressed: _saveSetlist,
+          ),
+          // SOLICITUD: Añadir botón de eliminar solo si se está editando un setlist.
+          if (widget.setlist != null)
+          IconButton(
+            icon: const Icon(Icons.delete_forever, color: Colors.redAccent),
+            tooltip: 'Eliminar Setlist',
+            onPressed: _confirmDeleteSetlist,
           ),
         ],
       ),

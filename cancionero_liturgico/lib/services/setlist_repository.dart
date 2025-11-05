@@ -160,9 +160,18 @@ class SetlistRepository {
     print("🏁 VERIFICACIÓN FINAL: ${relacionesFinal.length} relaciones persistentes para setlist ${setlist.id}");
   }
 
+  // SOLUCIÓN: Usar una transacción para garantizar que tanto el setlist como sus relaciones se eliminen.
   Future<void> deleteSetlist(int id) async {
     final db = await _databaseHelper.database;
-    await db.delete('setlists', where: 'id = ?', whereArgs: [id]);
+    await db.transaction((txn) async {
+      // Primero, eliminar las relaciones en la tabla 'setlist_cancion'
+      await txn.delete('setlist_cancion', where: 'setlist_id = ?', whereArgs: [id]);
+      print("🗑️  Relaciones eliminadas para setlist ID: $id");
+
+      // Luego, eliminar el setlist principal de la tabla 'setlists'
+      await txn.delete('setlists', where: 'id = ?', whereArgs: [id]);
+      print("🗑️  Setlist principal eliminado ID: $id");
+    });
   }
 
   /// Busca en la base de datos todos los setlists que han sido modificados
