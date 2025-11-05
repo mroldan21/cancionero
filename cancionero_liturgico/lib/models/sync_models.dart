@@ -84,6 +84,7 @@ class RespuestaDescarga {
   final List<int> cancionesEliminadas;
   final List<Map<String, dynamic>> setlists;
   final List<Map<String, dynamic>> setlistCanciones;
+  final List<dynamic> categorias; // ← AÑADIR ESTE CAMPO
   final int totalCambios;
   final DateTime timestampServidor;
 
@@ -92,6 +93,7 @@ class RespuestaDescarga {
     required this.cancionesEliminadas,
     required this.setlists,
     required this.setlistCanciones,
+    required this.categorias, // ← AÑADIR ESTE CAMPO
     required this.totalCambios,
     required this.timestampServidor,
   });
@@ -102,6 +104,7 @@ class RespuestaDescarga {
       cancionesEliminadas: List<int>.from(json['canciones_eliminadas'] ?? []),
       setlists: List<Map<String, dynamic>>.from(json['setlists'] ?? []),
       setlistCanciones: List<Map<String, dynamic>>.from(json['setlist_canciones'] ?? []),
+      categorias: json['categorias'] ?? [], // ← AÑADIR ESTE CAMPO
       totalCambios: json['total_cambios'] ?? 0,
       timestampServidor: DateTime.parse(json['timestamp_servidor']),
     );

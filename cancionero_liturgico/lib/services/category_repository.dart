@@ -1,5 +1,6 @@
 import 'package:cancionero_liturgico/models/category.dart';
 import 'package:cancionero_liturgico/services/database_helper.dart';
+import 'package:sqflite/sqflite.dart';
 
 class CategoryRepository {
   final DatabaseHelper _databaseHelper = DatabaseHelper();
@@ -172,5 +173,14 @@ class CategoryRepository {
       
       print("   - '${categoria['nombre']}' (ID: ${categoria['id']}): ${relaciones.length} canciones");
     }
+  }
+
+  Future<void> saveCategory(Category category) async {
+    final db = await _databaseHelper.database;
+    await db.insert(
+      'categories',
+      category.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 }

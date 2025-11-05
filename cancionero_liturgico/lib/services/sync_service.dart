@@ -248,8 +248,38 @@ class SyncService {
   }
 
   // 5. Aplicar cambios del servidor localmente
+  // Future<void> _aplicarCambiosLocales(RespuestaDescarga cambios) async {
+  //   print("SYNC_DEBUG: 5. 🔄 Aplicando cambios en la base de datos local...");
+  //   // Procesar canciones nuevas/actualizadas
+  //   for (final cancionData in cambios.canciones) {
+  //     print("SYNC_DEBUG: 5.1. 🎶 Procesando canción descargada: ${cancionData['titulo']}");
+  //     await _procesarCancionDescargada(cancionData);
+  //   }
+    
+  //   // Procesar canciones eliminadas
+  //   for (final idEliminado in cambios.cancionesEliminadas) {
+  //     print("SYNC_DEBUG: 5.2. 🗑️ Eliminando canción con ID: $idEliminado");
+  //     await songRepository.deleteSong(idEliminado);
+  //   }
+    
+  //   // Procesar categorías - CORREGIDO
+  //   for (final categoriaData in cambios.categorias) {
+  //     print("SYNC_DEBUG: 5.4. 🏷️ Procesando categoría: ${categoriaData['nombre']}");
+  //     await _procesarCategoriaDescargada(categoriaData);
+  //   }
+    
+  //   // Procesar setlists (que ahora incluyen sus canciones)
+  //   for (final setlistData in cambios.setlists) {
+  //     await _procesarSetlistDescargado(setlistData);
+  //   }
+    
+  //   // El bucle para 'setlistCanciones' ya no es necesario.
+  //   print("SYNC_DEBUG: 5.4. ✅ Finalizada la aplicación de cambios locales.");
+  // }
+
   Future<void> _aplicarCambiosLocales(RespuestaDescarga cambios) async {
     print("SYNC_DEBUG: 5. 🔄 Aplicando cambios en la base de datos local...");
+    
     // Procesar canciones nuevas/actualizadas
     for (final cancionData in cambios.canciones) {
       print("SYNC_DEBUG: 5.1. 🎶 Procesando canción descargada: ${cancionData['titulo']}");
@@ -262,18 +292,26 @@ class SyncService {
       await songRepository.deleteSong(idEliminado);
     }
     
-    // Procesar categorías
+    // Procesar setlists
+    for (final setlistData in cambios.setlists) {
+      print("SYNC_DEBUG: 5.3. 📋 Procesando setlist: ${setlistData['nombre']}");
+      await _procesarSetlistDescargado(setlistData);
+    }
+
+    // Procesar relaciones setlist-canciones (si existen)
+    if (cambios.setlistCanciones.isNotEmpty) {
+      print("SYNC_DEBUG: 5.4. 🔗 Procesando ${cambios.setlistCanciones.length} relaciones setlist-canciones");
+      for (final relacionData in cambios.setlistCanciones) {
+        await _procesarSetlistCancionDescargada(relacionData);
+      }
+    }
+    
+    // Procesar categorías - CORREGIDO (usando tu método mejorado)
     for (final categoriaData in cambios.categorias) {
       await _procesarCategoriaDescargada(categoriaData);
     }
     
-    // Procesar setlists (que ahora incluyen sus canciones)
-    for (final setlistData in cambios.setlists) {
-      await _procesarSetlistDescargado(setlistData);
-    }
-    
-    // El bucle para 'setlistCanciones' ya no es necesario.
-    print("SYNC_DEBUG: 5.4. ✅ Finalizada la aplicación de cambios locales.");
+    print("SYNC_DEBUG: 5.6. ✅ Todos los cambios aplicados localmente");
   }
 
   // =======================================================================
@@ -579,6 +617,24 @@ class SyncService {
     }
   }
 
+  Future<void> _procesarSetlistCancionDescargada(Map<String, dynamic> relacionData) async {
+    try {
+      print("SYNC_DEBUG: 5.4.1. 🔗 Procesando relación setlist-canción: "
+            "setlist=${relacionData['setlist_id']}, canción=${relacionData['cancion_id']}");
+      
+      // Aquí deberías tener un método en setlistRepository para guardar la relación
+      await setlistRepository.agregarCancionASetlist(
+        setlistId: relacionData['setlist_id'],
+        cancionId: relacionData['cancion_id'],
+        orden: relacionData['orden'] ?? 0,
+        transposicionSemitonos: relacionData['transposicion_semitonos'] ?? 0,
+        capoPersonalizado: relacionData['capo_personalizado'] ?? -1,
+      );
+      
+    } catch (e) {
+      print("SYNC_DEBUG: 5.4.2. ❌ Error procesando relación setlist-canción: $e");
+    }
+  }
   // Future<void> _procesarSetlistDescargado(Map<String, dynamic> setlistData) async {
   //   // Implementar según tu modelo Setlist
   // }

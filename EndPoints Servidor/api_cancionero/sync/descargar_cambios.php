@@ -54,21 +54,17 @@ try {
     // --- INICIO: LÓGICA MEJORADA PARA SETLISTS ---
     // 1. Obtener los setlists modificados
     $query = "SELECT id, nombre, fecha_evento, notas, fecha_creacion, fecha_modificacion 
-              FROM setlists WHERE fecha_modificacion > ?";
+            FROM setlists WHERE fecha_modificacion > ?";
     $stmt = $db->prepare($query);
     $stmt->execute([$ultima_sync]);
     $setlists_modificados = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // 2. Para cada setlist, obtener sus canciones
-    $query_canciones = "SELECT cancion_id, orden, transposicion_semitonos, capo_personalizado 
-                        FROM setlist_cancion WHERE setlist_id = ? ORDER BY orden ASC";
-    $stmt_canciones = $db->prepare($query_canciones);
-
-    foreach ($setlists_modificados as &$setlist) { // Usar referencia para modificar el array
-        $stmt_canciones->execute([$setlist['id']]);
-        $setlist['canciones'] = $stmt_canciones->fetchAll(PDO::FETCH_ASSOC);
-    }
-    unset($setlist); // Romper la referencia
+    // 2. Obtener TODAS las relaciones setlist-canciones modificadas
+    $query_relaciones = "SELECT setlist_id, cancion_id, orden, transposicion_semitonos, capo_personalizado 
+                        FROM setlist_cancion ";
+    $stmt_relaciones = $db->prepare($query_relaciones);
+    $stmt_relaciones->execute();
+    $setlist_canciones = $stmt_relaciones->fetchAll(PDO::FETCH_ASSOC);
     // --- FIN: LÓGICA MEJORADA PARA SETLISTS ---
 
     // --- INICIO: LÓGICA PARA CATEGORÍAS ---
@@ -102,9 +98,10 @@ try {
     ResponseHelper::sendSuccess([
         'canciones' => $canciones,
         'canciones_eliminadas' => $eliminadas,
-        'setlists' => $setlists_modificados, // Devolver la estructura anidada
+        'setlists' => $setlists_modificados, // Solo datos del setlist, sin canciones anidadas
+        'setlist_canciones' => $setlist_canciones, // Relaciones por separado
         'categorias' => $categorias, // Devolver las categorías
-        'total_cambios' => count($canciones) + count($eliminadas) + count($setlists_modificados) + count($categorias),
+        'total_cambios' => count($canciones) + count($eliminadas) + count($setlists_modificados) + count($setlist_canciones) + count($categorias),
         'timestamp_servidor' => date('c')
     ], "Cambios descargados correctamente");
 

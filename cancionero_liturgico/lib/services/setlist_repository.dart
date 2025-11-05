@@ -1,6 +1,7 @@
 import 'package:cancionero_liturgico/models/setlist_model.dart';
 import 'package:cancionero_liturgico/models/song.dart';
 import 'package:cancionero_liturgico/services/database_helper.dart';
+import 'package:sqflite/sqflite.dart';
 
 class SetlistRepository {
   final DatabaseHelper _databaseHelper = DatabaseHelper();
@@ -75,27 +76,6 @@ class SetlistRepository {
     print("SETLIST_DEBUG: 8. 🏁 TOTAL setlists cargados: ${setlists.length}");
     return setlists;
   }
-
-  // Future<void> insertSetlist(Setlist setlist) async {
-  //   final db = await _databaseHelper.database;
-  //   print("SETLIST_DEBUG: 💾 INSERTANDO setlist: '${setlist.name}' con ${setlist.songs.length} canciones");
-  //   await db.transaction((txn) async {
-  //     final setlistId = await txn.insert('setlists', setlist.toMap());
-  //     print("SETLIST_DEBUG: ✅ Setlist insertado con ID: $setlistId");
-
-  //     for (final item in setlist.songs) {
-  //       print("SETLIST_DEBUG:   💾 Insertando relación - Canción: ${item.song.id}, Orden: ${item.order}");
-  //       await txn.insert('setlist_cancion', {
-  //         'setlist_id': setlistId,
-  //         'cancion_id': item.song.id!,
-  //         'orden': item.order,
-  //         'transposicion_semitonos': item.transposition,
-  //         'capo_personalizado': item.capo,
-  //       });
-  //     }
-  //     print("SETLIST_DEBUG: ✅ ${setlist.songs.length} relaciones insertadas");
-  //   });
-  // }
 
   Future<void> insertSetlist(Setlist setlist) async {
     final db = await _databaseHelper.database;
@@ -270,7 +250,6 @@ class SetlistRepository {
     return setlists;
   }
 
-
   /// Obtiene un único setlist por su ID, incluyendo todas sus canciones.
   Future<Setlist?> getSetlistById(int id) async {
     final db = await _databaseHelper.database;
@@ -342,4 +321,28 @@ class SetlistRepository {
     print("SYNC_DEBUG: 📅 Fecha de modificación actualizada para setlist ID: $setlistId");
   }
 
+  Future<void> agregarCancionASetlist({
+    required int setlistId,
+    required int cancionId,
+    required int orden,
+    required int transposicionSemitonos,
+    required int capoPersonalizado,
+  }) async {
+    final db = await _databaseHelper.database;
+    
+    await db.insert(
+      'setlist_cancion',
+      {
+        'setlist_id': setlistId,
+        'cancion_id': cancionId,
+        'orden': orden,
+        'transposicion_semitonos': transposicionSemitonos,
+        'capo_personalizado': capoPersonalizado,
+        'fecha_modificacion': DateTime.now().toIso8601String(),
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    
+    print("SYNC_DEBUG: ✅ Relación setlist-canción agregada: setlist=$setlistId, canción=$cancionId");
+  }
 }
