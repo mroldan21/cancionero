@@ -262,18 +262,23 @@ class SyncService {
       await songRepository.deleteSong(idEliminado);
     }
     
-    // Procesar setlists
+    // Procesar categorías
+    for (final categoriaData in cambios.categorias) {
+      await _procesarCategoriaDescargada(categoriaData);
+    }
+    
+    // Procesar setlists (que ahora incluyen sus canciones)
     for (final setlistData in cambios.setlists) {
       await _procesarSetlistDescargado(setlistData);
     }
     
-    // Procesar relaciones setlist-canción
-    for (final relacionData in cambios.setlistCanciones) {
-      await _procesarRelacionSetlistCancion(relacionData);
-    }
+    // El bucle para 'setlistCanciones' ya no es necesario.
     print("SYNC_DEBUG: 5.4. ✅ Finalizada la aplicación de cambios locales.");
   }
 
+  // =======================================================================
+  // MÉTODOS DE PROCESAMIENTO DE DATOS DESCARGADOS
+  // =======================================================================
 
   Future<void> _procesarSetlistDescargado(Map<String, dynamic> setlistData) async {
     print("SYNC_DEBUG: 5.3.1. 📋 Procesando setlist descargado: '${setlistData['nombre']}' (ID: ${setlistData['id']})");
@@ -289,7 +294,26 @@ class SyncService {
             ? DateTime.parse(setlistData['fecha_evento'] as String) 
             : null,
         notes: setlistData['notas'] as String?,
-        songs: [], // Se poblará con las relaciones
+        // SOLUCIÓN: Mapear las canciones anidadas a objetos SetlistItem
+        songs: (setlistData['canciones'] as List<dynamic>).map((itemData) {
+          // Para crear el SetlistItem, necesitamos un objeto Song completo.
+          // Como no lo tenemos aquí, creamos un objeto Song "parcial" solo con el ID.
+          // El repositorio se encargará de usar este ID para la relación.
+          final songConId = Song(
+            id: itemData['cancion_id'] as int,
+            title: '', // El resto de los campos no son necesarios para la relación
+            content: '',
+            originalKey: '',
+            creationDate: DateTime.now(),
+            modificationDate: DateTime.now(),
+          );
+          return SetlistItem(
+            song: songConId,
+            order: itemData['orden'] as int,
+            transposition: itemData['transposicion_semitonos'] as int? ?? 0,
+            capo: itemData['capo_personalizado'] as int?,
+          );
+        }).toList(),
       );
 
       // Verificar si el setlist existe localmente
@@ -300,7 +324,8 @@ class SyncService {
         print("SYNC_DEBUG: 5.3.2. ➕ Insertando nuevo setlist: '${setlist.name}'");
         await setlistRepository.insertSetlist(setlist);
       } else {
-        // Actualizar setlist existente
+        // Actualizar setlist existente. El repositorio se encarga de borrar
+        // las relaciones viejas y poner las nuevas que vienen en `setlist.songs`.
         print("SYNC_DEBUG: 5.3.2. 🔄 Actualizando setlist existente: '${setlist.name}'");
         await setlistRepository.updateSetlist(setlist);
       }
@@ -311,12 +336,26 @@ class SyncService {
     }
   }
 
-  Future<void> _procesarRelacionSetlistCancion(Map<String, dynamic> relacionData) async {
-    print("SYNC_DEBUG: 5.3.5. 🔗 Procesando relación setlist-canción");
-    print("SYNC_DEBUG: 5.3.6. 📄 Datos de relación: ${json.encode(relacionData)}");
-    
-    // Esta función se llama para cada relación setlist-canción descargada
-    // Por ahora solo logueamos, ya que las relaciones se manejan en insertSetlist/updateSetlist
+  // NUEVO MÉTODO: Para procesar las categorías descargadas
+  Future<void> _procesarCategoriaDescargada(Map<String, dynamic> catData) async {
+    print("SYNC_DEBUG: 5.5. 🏷️  Procesando categoría descargada: '${catData['nombre']}'");
+    try {
+      final categoria = Category.fromMap(catData);
+      
+      // Verificar si la categoría ya existe por nombre
+      final categoriaExistente = await categoryRepository.getCategoryByName(categoria.name);
+
+      if (categoriaExistente == null) {
+        print("SYNC_DEBUG: 5.5.1. ➕ Insertando nueva categoría: '${categoria.name}'");
+        await categoryRepository.insertCategory(categoria);
+      } else {
+        // Si existe, la actualizamos para reflejar cambios de color, orden, etc.
+        print("SYNC_DEBUG: 5.5.1. 🔄 Actualizando categoría existente: '${categoria.name}'");
+        await categoryRepository.updateCategory(categoria.copyWith(id: categoriaExistente.id));
+      }
+    } catch (e) {
+      print("SYNC_DEBUG: 5.5.2. ❌ Error procesando categoría: $e");
+    }
   }
 
   // 6. Finalizar sincronización

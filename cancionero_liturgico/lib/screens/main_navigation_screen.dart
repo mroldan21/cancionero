@@ -18,10 +18,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
 
   final List<Widget> _screens = [
-    const CategoriesScreen(),
-    const SetlistListScreen(),
-    const FavoritesScreen(),
-    const SettingsScreen(),
+    const CategoriesScreen(key: PageStorageKey('categoriesScreen')),
+    const SetlistListScreen(key: PageStorageKey('setlistListScreen')),
+    const FavoritesScreen(key: PageStorageKey('favoritesScreen')),
+    const SettingsScreen(key: PageStorageKey('settingsScreen')),
   ];
 
   final List<String> _titles = [
@@ -54,10 +54,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       appBar: AppBar(
         title: Text(_titles[_selectedIndex]),
       ),
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
-      ),
+      body: _screens[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         items: const [

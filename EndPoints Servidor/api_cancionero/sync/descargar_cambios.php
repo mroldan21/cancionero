@@ -50,23 +50,36 @@ try {
     // Por ahora, devolvemos un array vacío para mantener la estructura de la respuesta.
     // Si tienes una tabla de 'elementos_eliminados', la consulta iría aquí.
     $eliminadas = [];
-
-    // Obtener setlists modificados
-    // CORRECCIÓN: Se elimina la condición 'activo = 1' que no existe.
-    $query = "SELECT * FROM setlists 
-              WHERE fecha_modificacion > ?";
+    
+    // --- INICIO: LÓGICA MEJORADA PARA SETLISTS ---
+    // 1. Obtener los setlists modificados
+    $query = "SELECT id, nombre, fecha_evento, notas, fecha_creacion, fecha_modificacion 
+              FROM setlists WHERE fecha_modificacion > ?";
     $stmt = $db->prepare($query);
     $stmt->execute([$ultima_sync]);
-    $setlists = $stmt->fetchAll();
+    $setlists_modificados = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // CORRECCIÓN: Obtener todas las relaciones para los setlists que han sido modificados.
-    // La tabla 'setlist_cancion' no tiene su propio timestamp.
-    $query = "SELECT sc.* FROM setlist_cancion sc
-              INNER JOIN setlists s ON sc.setlist_id = s.id
-              WHERE s.fecha_modificacion > ?";
-    $stmt = $db->prepare($query);
-    $stmt->execute([$ultima_sync]);
-    $setlist_canciones = $stmt->fetchAll();
+    // 2. Para cada setlist, obtener sus canciones
+    $query_canciones = "SELECT cancion_id, orden, transposicion_semitonos, capo_personalizado 
+                        FROM setlist_cancion WHERE setlist_id = ? ORDER BY orden ASC";
+    $stmt_canciones = $db->prepare($query_canciones);
+
+    foreach ($setlists_modificados as &$setlist) { // Usar referencia para modificar el array
+        $stmt_canciones->execute([$setlist['id']]);
+        $setlist['canciones'] = $stmt_canciones->fetchAll(PDO::FETCH_ASSOC);
+    }
+    unset($setlist); // Romper la referencia
+    // --- FIN: LÓGICA MEJORADA PARA SETLISTS ---
+
+    // --- INICIO: LÓGICA PARA CATEGORÍAS ---
+    // Obtener todas las categorías modificadas o creadas después de la última sync.
+    // Asumimos que la tabla 'categories' tiene un campo 'fecha_modificacion'. Si no, hay que añadirlo.
+    // Por ahora, descargaremos todas las que no son predefinidas para asegurar consistencia.
+    $query_categorias = "SELECT id, nombre, color, orden, es_predefinida FROM categories WHERE fecha_modificacion > ?";
+    $stmt_categorias = $db->prepare($query_categorias);
+    $stmt_categorias->execute([$ultima_sync]);
+    $categorias = $stmt_categorias->fetchAll(PDO::FETCH_ASSOC);
+    // --- FIN: LÓGICA PARA CATEGORÍAS ---
 
     // Log de la descarga
     $query = "INSERT INTO logs_sincronizacion 
@@ -89,9 +102,9 @@ try {
     ResponseHelper::sendSuccess([
         'canciones' => $canciones,
         'canciones_eliminadas' => $eliminadas,
-        'setlists' => $setlists,
-        'setlist_canciones' => $setlist_canciones,
-        'total_cambios' => count($canciones) + count($eliminadas) + count($setlists),
+        'setlists' => $setlists_modificados, // Devolver la estructura anidada
+        'categorias' => $categorias, // Devolver las categorías
+        'total_cambios' => count($canciones) + count($eliminadas) + count($setlists_modificados) + count($categorias),
         'timestamp_servidor' => date('c')
     ], "Cambios descargados correctamente");
 
