@@ -10,6 +10,7 @@ import '../models/setlist_model.dart';
 import './song_repository.dart';
 import './category_repository.dart';
 import './setlist_repository.dart'; // CORRECCIÓN: Importar el repositorio faltante
+import 'package:cancionero_liturgico/services/database_helper.dart';
 
 
 class SyncService {
@@ -619,10 +620,20 @@ class SyncService {
 
   Future<void> _procesarSetlistCancionDescargada(Map<String, dynamic> relacionData) async {
     try {
-      print("SYNC_DEBUG: 5.4.1. 🔗 Procesando relación setlist-canción: "
-            "setlist=${relacionData['setlist_id']}, canción=${relacionData['cancion_id']}");
+      print("SYNC_DEBUG: 5.3.5. 🔗 Procesando relación setlist-canción");
+      print("SYNC_DEBUG: 5.3.6. 📄 Datos de relación: $relacionData");
       
-      // Aquí deberías tener un método en setlistRepository para guardar la relación
+      // VERIFICACIÓN CRÍTICA - ¿Existen los IDs en la base de datos local?
+      final bool existeSetlist = await _verificarExistenciaSetlist(relacionData['setlist_id']);
+      final bool existeCancion = await _verificarExistenciaCancion(relacionData['cancion_id']);
+      
+      print("SYNC_DEBUG: 5.3.7. 🔍 Verificación - Setlist ${relacionData['setlist_id']} existe: $existeSetlist");
+      print("SYNC_DEBUG: 5.3.8. 🔍 Verificación - Canción ${relacionData['cancion_id']} existe: $existeCancion");
+      
+      if (!existeSetlist || !existeCancion) {
+        print("SYNC_DEBUG: 5.3.9. ⚠️ ADVERTENCIA: Relación referencia IDs no existentes");
+      }
+      
       await setlistRepository.agregarCancionASetlist(
         setlistId: relacionData['setlist_id'],
         cancionId: relacionData['cancion_id'],
@@ -631,15 +642,43 @@ class SyncService {
         capoPersonalizado: relacionData['capo_personalizado'] ?? -1,
       );
       
-    } catch (e) {
-      print("SYNC_DEBUG: 5.4.2. ❌ Error procesando relación setlist-canción: $e");
+      print("SYNC_DEBUG: 5.3.10. ✅ Relación guardada en repository");
+      
+    } catch (e, stackTrace) {
+      print("SYNC_DEBUG: 5.3.11. ❌ ERROR en _procesarSetlistCancionDescargada: $e");
+      print("SYNC_DEBUG: 5.3.12. 📍 StackTrace: $stackTrace");
     }
   }
-  // Future<void> _procesarSetlistDescargado(Map<String, dynamic> setlistData) async {
-  //   // Implementar según tu modelo Setlist
-  // }
 
-  // Future<void> _procesarRelacionSetlistCancion(Map<String, dynamic> relacionData) async {
-  //   // Implementar según tu modelo
-  // }
+  // Añade estos métodos auxiliares en sync_service.dart
+  Future<bool> _verificarExistenciaSetlist(int setlistId) async {
+    try {
+      final db = await DatabaseHelper().database;
+      final result = await db.query(
+        'setlists',
+        where: 'id = ?',
+        whereArgs: [setlistId],
+        limit: 1
+      );
+      return result.isNotEmpty;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> _verificarExistenciaCancion(int cancionId) async {
+    try {
+      final db = await DatabaseHelper().database;
+      final result = await db.query(
+        'songs',
+        where: 'id = ?',
+        whereArgs: [cancionId],
+        limit: 1
+      );
+      return result.isNotEmpty;
+    } catch (e) {
+      return false;
+    }
+  }
+
 }

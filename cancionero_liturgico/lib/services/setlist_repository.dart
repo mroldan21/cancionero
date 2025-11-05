@@ -328,21 +328,39 @@ class SetlistRepository {
     required int transposicionSemitonos,
     required int capoPersonalizado,
   }) async {
-    final db = await _databaseHelper.database;
-    
-    await db.insert(
-      'setlist_cancion',
-      {
-        'setlist_id': setlistId,
-        'cancion_id': cancionId,
-        'orden': orden,
-        'transposicion_semitonos': transposicionSemitonos,
-        'capo_personalizado': capoPersonalizado,
-        'fecha_modificacion': DateTime.now().toIso8601String(),
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-    
-    print("SYNC_DEBUG: ✅ Relación setlist-canción agregada: setlist=$setlistId, canción=$cancionId");
+    try {
+      print("SETLIST_REPO_DEBUG: 1. 💾 Intentando guardar relación en BD");
+      print("SETLIST_REPO_DEBUG: 2. 📝 Datos: setlist=$setlistId, cancion=$cancionId, orden=$orden");
+      
+      final db = await _databaseHelper.database;
+      
+      final resultado = await db.insert(
+        'setlist_cancion',
+        {
+          'setlist_id': setlistId,
+          'cancion_id': cancionId,
+          'orden': orden,
+          'transposicion_semitonos': transposicionSemitonos,
+          'capo_personalizado': capoPersonalizado,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      
+      print("SETLIST_REPO_DEBUG: 3. ✅ Insert exitoso, resultado: $resultado");
+      
+      // VERIFICACIÓN INMEDIATA - leer lo que acabamos de guardar
+      final verificacion = await db.query(
+        'setlist_cancion',
+        where: 'setlist_id = ? AND cancion_id = ?',
+        whereArgs: [setlistId, cancionId],
+      );
+      
+      print("SETLIST_REPO_DEBUG: 4. 🔍 Verificación post-insert: ${verificacion.length} registros encontrados");
+      
+    } catch (e, stackTrace) {
+      print("SETLIST_REPO_DEBUG: 5. ❌ ERROR en agregarCancionASetlist: $e");
+      print("SETLIST_REPO_DEBUG: 6. 📍 StackTrace: $stackTrace");
+      rethrow;
+    }
   }
 }
