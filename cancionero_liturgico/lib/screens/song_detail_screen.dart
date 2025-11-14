@@ -83,6 +83,68 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
     }
   }
 
+    Future<void> _showDeleteConfirmation(BuildContext context, Song currentSong) async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Eliminar canción'),
+          content: Text(
+            '¿Estás seguro de que deseas eliminar "${currentSong.title}"?\n\n'
+            'Esta acción eliminará la canción y todas sus relaciones con categorías y setlists.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete == true && mounted) {
+      final songProvider = Provider.of<SongProvider>(context, listen: false);
+      final songRepository = Provider.of<SongRepository>(context, listen: false);
+      
+      try {
+        // 1. Eliminar de la base de datos
+        await songRepository.deleteSong(currentSong.id!);
+        
+        // 2. Limpiar la canción seleccionada
+        if (isSetlistMode) songProvider.clearSetlistItem();
+        songProvider.clearSelectedSong();
+        
+        if (mounted) {
+          // 3. Volver a la pantalla anterior
+          Navigator.of(context).pop(true); // true indica que hubo cambios
+          
+          // 4. Mostrar confirmación
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Canción "${currentSong.title}" eliminada correctamente'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error al eliminar la canción: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     print("[SCREEN] Build: SongDetailScreen");
@@ -142,6 +204,12 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
           ),
           title: Text(currentSong.title),
           actions: [
+                          // Botón de eliminar canción
+              IconButton(
+                icon: const Icon(Icons.delete_outline),
+                tooltip: 'Eliminar canción',
+                onPressed: () => _showDeleteConfirmation(context, currentSong),
+              ),
             IconButton(
               // SOLICITUD: Usar el estado local y añadir color para destacar.
               icon: Icon(
