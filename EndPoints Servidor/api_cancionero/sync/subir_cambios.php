@@ -531,22 +531,37 @@ function procesarCancionesSetlist($db, $setlist_id, $canciones) {
 }
 
 // FUNCIÓN ELIMINAR SETLIST (MANTENER ESTA FUNCIÓN)
+// SOLUCIÓN: Modificar para usar una transacción y asegurar el borrado de asociaciones.
 function eliminarSetlist($db, $datos) {
     error_log("===== ELIMINANDO SETLIST ID: {$datos['id']} =====");
-    
-    // La eliminación en cascada (ON DELETE CASCADE) se encargará de la tabla `setlist_cancion`
-    $query = "DELETE FROM setlists WHERE id = ?";
-    $stmt = $db->prepare($query);
-    $result = $stmt->execute([$datos['id']]);
-    $rowCount = $stmt->rowCount();
-    
-    if ($result && $rowCount > 0) {
-        error_log("✅ Setlist ID {$datos['id']} eliminado exitosamente");
-    } else {
-        error_log("⚠️  Setlist ID {$datos['id']} no se pudo eliminar o no existía");
+    $setlist_id = $datos['id'];
+
+    try {
+        $db->beginTransaction();
+
+        // 1. Eliminar las asociaciones en la tabla 'setlist_cancion'
+        $query_relaciones = "DELETE FROM setlist_cancion WHERE setlist_id = ?";
+        $stmt_relaciones = $db->prepare($query_relaciones);
+        $stmt_relaciones->execute([$setlist_id]);
+        $relaciones_eliminadas = $stmt_relaciones->rowCount();
+        error_log("🗑️  Relaciones eliminadas para setlist ID $setlist_id: $relaciones_eliminadas filas");
+
+        // 2. Eliminar el setlist principal de la tabla 'setlists'
+        $query_setlist = "DELETE FROM setlists WHERE id = ?";
+        $stmt_setlist = $db->prepare($query_setlist);
+        $stmt_setlist->execute([$setlist_id]);
+        $setlist_eliminado_count = $stmt_setlist->rowCount();
+
+        $db->commit();
+        error_log("✅ Transacción completada. Setlist ID $setlist_id eliminado.");
+
+        return $setlist_eliminado_count;
+
+    } catch (Exception $e) {
+        $db->rollBack();
+        error_log("❌ ERROR al eliminar setlist ID $setlist_id. Transacción revertida. Error: " . $e->getMessage());
+        throw $e; // Relanzar la excepción para que el manejador principal la capture.
     }
-    
-    return $rowCount;
 }
 
 // --- FIN: Funciones para procesar Setlists ---

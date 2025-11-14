@@ -20,9 +20,6 @@ class SettingsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Ajustes de la app'),
-        actions: const [
-          SyncButton(),
-        ],
       ),
       body: ListView(
         children: [
@@ -112,6 +109,14 @@ class SettingsScreen extends StatelessWidget {
           // --- Sección Sincronización ---
           const Divider(),
           const ListTile(title: Text('SINCRONIZACIÓN', style: TextStyle(fontWeight: FontWeight.bold))),
+          // SOLICITUD: Mover el botón de sincronización a una posición más clara.
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+            child: Center(
+              child: SyncButton(),
+            ),
+          ),
+
           // ListTile( // Ejemplo de campo para URL de BD central
           //   title: const Text('URL Base de Datos Central'),
           //   subtitle: Text(_getCentralDbUrl()), // Obtener desde SharedPreferences
