@@ -117,7 +117,7 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
         await songRepository.deleteSong(currentSong.id!);
         
         // 2. Limpiar la canción seleccionada
-        if (isSetlistMode) songProvider.clearSetlistItem();
+        if (widget.setlistItems?.isNotEmpty ?? false) songProvider.clearSetlistItem();
         songProvider.clearSelectedSong();
         
         if (mounted) {
@@ -149,7 +149,7 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
   Widget build(BuildContext context) {
     print("[SCREEN] Build: SongDetailScreen");
     
-    final isSetlistMode = widget.setlistItems?.isNotEmpty ?? false;
+    final widget.setlistItems?.isNotEmpty ?? false = widget.setlistItems?.isNotEmpty ?? false;
 
     // Escuchamos siempre al provider para reaccionar a cambios (next/previous y guardado).
     final songProvider = Provider.of<SongProvider>(context, listen: true);
@@ -158,7 +158,7 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
     // SOLUCIÓN: Determinar la fuente de verdad para la canción a mostrar.
     // Priorizar la canción del provider si está en modo setlist o si es la misma canción.
     Song currentSong;
-    if (isSetlistMode && songProvider.currentSong != null) {
+    if (widget.setlistItems?.isNotEmpty ?? false && songProvider.currentSong != null) {
       // Si estamos en modo setlist, la canción actual SIEMPRE es la del provider.
       currentSong = songProvider.currentSong!;
     } else if (songProvider.currentSong != null && songProvider.currentSong!.id == widget.song.id) { // Si es la misma canción, usar la del provider
@@ -192,7 +192,7 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
       onPopInvoked: (didPop) {
         if (didPop) return; // Si ya se hizo pop, no hacer nada.
         final songProvider = Provider.of<SongProvider>(context, listen: false);
-        if (isSetlistMode) songProvider.clearSetlistItem();
+        if (widget.setlistItems?.isNotEmpty ?? false) songProvider.clearSetlistItem();
         songProvider.clearSelectedSong();
         Navigator.pop(context, _hasChanges); // Devolver si hubo cambios.
       },
@@ -323,7 +323,7 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
           ),
         ),
         // Mostrar la barra de navegación del setlist si aplica
-        bottomNavigationBar: isSetlistMode
+        bottomNavigationBar: widget.setlistItems?.isNotEmpty ?? false
             ? BottomAppBar(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
