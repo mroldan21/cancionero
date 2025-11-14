@@ -29,7 +29,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> with SingleTickerPr
     _tabController.addListener(() => setState(() {})); // Para reconstruir y actualizar el FAB
     _loadCategories();
     //_refreshCategories(); 
-    _debugCategorias();
+    //_debugCategorias();
   }
 
   void _loadCategories() {
@@ -400,6 +400,7 @@ class _CategoryListViewState extends State<_CategoryListView> {
     if (widget.reorderable) {
       return ReorderableListView.builder(
         padding: const EdgeInsets.all(8.0),
+        buildDefaultDragHandles: false,
         itemCount: _categories.length,
         itemBuilder: (context, index) {
           final category = _categories[index];

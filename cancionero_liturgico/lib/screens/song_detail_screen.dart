@@ -148,8 +148,6 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
   @override
   Widget build(BuildContext context) {
     print("[SCREEN] Build: SongDetailScreen");
-    
-    final widget.setlistItems?.isNotEmpty ?? false = widget.setlistItems?.isNotEmpty ?? false;
 
     // Escuchamos siempre al provider para reaccionar a cambios (next/previous y guardado).
     final songProvider = Provider.of<SongProvider>(context, listen: true);
