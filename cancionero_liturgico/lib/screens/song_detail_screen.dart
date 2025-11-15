@@ -202,12 +202,6 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
           ),
           title: Text(currentSong.title),
           actions: [
-                          // Botón de eliminar canción
-              IconButton(
-                icon: const Icon(Icons.delete_outline),
-                tooltip: 'Eliminar canción',
-                onPressed: () => _showDeleteConfirmation(context, currentSong),
-              ),
             IconButton(
               // SOLICITUD: Usar el estado local y añadir color para destacar.
               icon: Icon(
@@ -229,24 +223,39 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
                 );
               },
             ),
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () {
-                // MEJORA: Navegar y esperar un resultado para actualizar la UI
-                Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(builder: (context) => SongEditScreen(song: currentSong)),
-                ).then((result) async {
-                  // Si la edición fue exitosa (result == true), recargar la canción en el provider.
-                  if (result == true) {
-                    final updatedSongFromDb = await songRepository.getSongById(currentSong.id!);
-                    if (updatedSongFromDb != null) {
-                      songProvider.updateSongInList(updatedSongFromDb); // Actualizar la lista maestra
-                      songProvider.setSelectedSong(updatedSongFromDb); // Actualizar la canción seleccionada
+            // SOLUCIÓN: Agrupar acciones adicionales en un PopupMenuButton
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'edit') {
+                  // Lógica para editar
+                  Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(builder: (context) => SongEditScreen(song: currentSong)),
+                  ).then((result) async {
+                    if (result == true) {
+                      final updatedSongFromDb = await songRepository.getSongById(currentSong.id!);
+                      if (updatedSongFromDb != null) {
+                        songProvider.updateSongInList(updatedSongFromDb);
+                        songProvider.setSelectedSong(updatedSongFromDb);
+                      }
                     }
-                  }
-                });
+                  });
+                } else if (value == 'delete') {
+                  // Lógica para eliminar
+                  _showDeleteConfirmation(context, currentSong);
+                }
               },
+              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                const PopupMenuItem<String>(
+                  value: 'edit',
+                  child: ListTile(leading: Icon(Icons.edit), title: Text('Editar canción')),
+                ),
+                const PopupMenuDivider(),
+                const PopupMenuItem<String>(
+                  value: 'delete',
+                  child: ListTile(leading: Icon(Icons.delete_outline, color: Colors.red), title: Text('Eliminar canción', style: TextStyle(color: Colors.red))),
+                ),
+              ],
             ),
           ],
         ),

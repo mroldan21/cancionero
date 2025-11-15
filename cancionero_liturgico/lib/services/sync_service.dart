@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -425,6 +426,19 @@ class SyncService {
   // FUNCIÓN PRINCIPAL - Se ejecuta al pulsar el botón
   Future<ResultadoSync> sincronizarAhora() async {
     String sessionId = '';
+
+    // VERIFICACIÓN DE CONEXIÓN: Comprobar si hay internet antes de empezar.
+    final connectivityResult = await (Connectivity().checkConnectivity());
+    if (connectivityResult.contains(ConnectivityResult.none)) {
+      print('--- ❌ ERROR FATAL EN SINCRONIZACIÓN: No hay conexión a internet. ---');
+      return ResultadoSync(
+        success: false,
+        message: 'No hay conexión a internet. Por favor, conéctate a una red y vuelve a intentarlo.',
+        timestamp: DateTime.now(),
+      );
+    }
+
+    // El resto del proceso de sincronización continúa si hay conexión.
     
     try {
       print('--- INICIO DEL PROCESO DE SINCRONIZACIÓN ---');
