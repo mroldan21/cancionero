@@ -1,579 +1,117 @@
 import 'package:flutter/material.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:scroll_to_index/scroll_to_index.dart';
-import '../models/cancion_model.dart';
-import '../services/transposition_service.dart';
+import 'package:provider/provider.dart';
+import 'package:cancionero_liturgico/models/setlist_model.dart';
+import 'package:cancionero_liturgico/services/song_provider.dart';
+import 'package:cancionero_liturgico/screens/presentation_screen.dart';
 
-class PresentationModeScreen extends StatefulWidget {
-  final Cancion cancion;
-  final List<Cancion>? setlistCanciones;
-  final int initialIndex;
+class PresentationModeScreen extends StatelessWidget {
+  final Setlist? setlist; // Si se pasa un setlist, reproduce ese; si no, usa la canción seleccionada individualmente
 
-  const PresentationModeScreen({
-    Key? key,
-    required this.cancion,
-    this.setlistCanciones,
-    this.initialIndex = 0,
-  }) : super(key: key);
+  const PresentationModeScreen({super.key, this.setlist});
 
   @override
-  _PresentationModeScreenState createState() => _PresentationModeScreenState();
+  Widget build(BuildContext context) {
+    final songProvider = Provider.of<SongProvider>(context);
+
+    if (setlist != null && setlist!.songs.isNotEmpty) {
+      // Si se proporciona un setlist, iniciar reproducción del setlist
+      return _SetlistPresentationController(setlist: setlist!);
+    } else {
+      // Si no hay setlist, verificar si hay una canción individual seleccionada
+      final selectedSong = songProvider.currentSong;
+      if (selectedSong == null) {
+        return const Scaffold(
+          body: Center(child: Text('Selecciona una canción o un setlist para presentar')),
+        );
+      }
+      // Presentar la canción individual (sin callbacks de next/previous)
+      return PresentationScreen(song: selectedSong);
+    }
+  }
 }
 
-class _PresentationModeScreenState extends State<PresentationModeScreen> {
-  late AutoScrollController _scrollController;
-  late int _currentTransposicion;
-  late int _currentCapo;
-  bool _isScrolling = false;
-  double _scrollSpeed = 1.0;
-  double _fontSize = 24.0;
-  bool _isDarkMode = true;
-  int _currentSetlistIndex = 0;
+// Widget interno para controlar la reproducción de un setlist
+class _SetlistPresentationController extends StatefulWidget {
+  final Setlist setlist;
+
+  const _SetlistPresentationController({required this.setlist});
 
   @override
-  void initState() {
-    super.initState();
-    _scrollController = AutoScrollController();
-    _currentTransposicion = 0;
-    _currentCapo = widget.cancion.posicionCapo;
-    _currentSetlistIndex = widget.initialIndex;
-    
-    // Activar wake lock para mantener pantalla encendida
-    WakelockPlus.enable();
-  }
+  State<_SetlistPresentationController> createState() => _SetlistPresentationControllerState();
+}
 
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    // Desactivar wake lock al salir
-    WakelockPlus.disable();
-    super.dispose();
-  }
-
-  void _toggleScroll() {
-    setState(() {
-      _isScrolling = !_isScrolling;
-    });
-
-    if (_isScrolling) {
-      _startAutoScroll();
-    }
-  }
-
-  void _startAutoScroll() {
-    Future.doWhile(() async {
-      if (!_isScrolling) return false;
-      
-      // Calcular velocidad basada en tempo (RF-021)
-      double velocidad = _calculateScrollSpeed();
-      
-      // Scroll suave
-      await _scrollController.scrollToOffset(
-        _scrollController.offset + velocidad,
-        duration: const Duration(milliseconds: 1000),
-      );
-      
-      // Verificar si llegó al final
-      if (_scrollController.offset >= _scrollController.position.maxScrollExtent) {
-        setState(() {
-          _isScrolling = false;
-        });
-        return false;
-      }
-      
-      return _isScrolling;
-    });
-  }
-
-  double _calculateScrollSpeed() {
-    // Algoritmo de scroll inteligente basado en tempo (Apéndice C)
-    final tempo = widget.cancion.tempoBpm ?? 120;
-    final factorBase = tempo / 60.0; // Negras por segundo
-    final velocidadBase = factorBase * 50.0; // Pixels por segundo base
-    
-    return velocidadBase * _scrollSpeed;
-  }
-
-  String _getLetraTranspuesta() {
-    if (_currentTransposicion == 0) {
-      return widget.cancion.letraConAcordes;
-    }
-    
-    return TransposicionService.transponerLetraCompleta(
-      widget.cancion.letraConAcordes,
-      _currentTransposicion,
-    );
-  }
-
-  String _getTonalidadActual() {
-    if (_currentTransposicion == 0) {
-      return widget.cancion.tonalidadOriginal;
-    }
-    
-    return TransposicionService.transponerAcorde(
-      widget.cancion.tonalidadOriginal,
-      _currentTransposicion,
-    );
-  }
-
-  void _changeTransposicion(int semitonos) {
-    setState(() {
-      _currentTransposicion = semitonos;
-    });
-  }
-
-  void _changeCapo(int capo) {
-    setState(() {
-      _currentCapo = capo;
-    });
-  }
+class _SetlistPresentationControllerState extends State<_SetlistPresentationController> {
+  int _currentIndex = 0;
 
   void _nextSong() {
-    if (widget.setlistCanciones == null) return;
-    
-    final nextIndex = _currentSetlistIndex + 1;
-    if (nextIndex < widget.setlistCanciones!.length) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PresentationModeScreen(
-            cancion: widget.setlistCanciones![nextIndex],
-            setlistCanciones: widget.setlistCanciones,
-            initialIndex: nextIndex,
-          ),
-        ),
-      );
+    if (_currentIndex < widget.setlist.songs.length - 1) {
+      setState(() {
+        _currentIndex++;
+      });
     }
   }
 
   void _previousSong() {
-    if (widget.setlistCanciones == null) return;
-    
-    final prevIndex = _currentSetlistIndex - 1;
-    if (prevIndex >= 0) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PresentationModeScreen(
-            cancion: widget.setlistCanciones![prevIndex],
-            setlistCanciones: widget.setlistCanciones,
-            initialIndex: prevIndex,
-          ),
-        ),
-      );
+    if (_currentIndex > 0) {
+      setState(() {
+        _currentIndex--;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final letraTranspuesta = _getLetraTranspuesta();
-    final tonalidadActual = _getTonalidadActual();
-    final isSetlist = widget.setlistCanciones != null;
-
-    return Scaffold(
-      backgroundColor: _isDarkMode ? Colors.black : Colors.white,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header con información de la canción
-            _buildHeader(tonalidadActual, isSetlist),
-            
-            // Área principal de la letra
-            Expanded(
-              child: _buildLyricsArea(letraTranspuesta),
-            ),
-            
-            // Controles inferiores
-            _buildControls(isSetlist),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(String tonalidadActual, bool isSetlist) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: _isDarkMode ? Colors.grey[900] : Colors.grey[100],
-        border: Border(
-          bottom: BorderSide(
-            color: _isDarkMode ? Colors.grey[700]! : Colors.grey[300]!,
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          // Información de la canción
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.cancion.titulo,
-                  style: TextStyle(
-                    color: _isDarkMode ? Colors.white : Colors.black,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (widget.cancion.autor != null && widget.cancion.autor!.isNotEmpty)
-                  Text(
-                    widget.cancion.autor!,
-                    style: TextStyle(
-                      color: _isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                      fontSize: 14,
-                    ),
-                  ),
-                Text(
-                  'Tono: $tonalidadActual${_currentCapo > 0 ? ' | Capo: $_currentCapo' : ''}',
-                  style: TextStyle(
-                    color: _isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          // Indicador de setlist
-          if (isSetlist)
-            Text(
-              '${_currentSetlistIndex + 1}/${widget.setlistCanciones!.length}',
-              style: TextStyle(
-                color: _isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLyricsArea(String letraTranspuesta) {
-    return SingleChildScrollView(
-      controller: _scrollController,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        child: Text.rich(
-          _parseLyricsWithChords(letraTranspuesta),
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: _fontSize,
-            height: 1.6,
-            color: _isDarkMode ? Colors.white : Colors.black,
-          ),
-        ),
-      ),
-    );
-  }
-
-  TextSpan _parseLyricsWithChords(String text) {
-    final lines = text.split('\n');
-    final spans = <TextSpan>[];
-
-    for (final line in lines) {
-      if (line.trim().isEmpty) {
-        spans.add(const TextSpan(text: '\n\n'));
-        continue;
-      }
-
-      // Detectar si la línea contiene acordes (empieza con espacios o acordes)
-      final chordRegex = RegExp(r'^(\s*[A-G][#b]?(?:m|maj|min|sus|dim|aug|add)?\d*\s*)+$');
-      final isChordLine = chordRegex.hasMatch(line);
-
-      if (isChordLine) {
-        // Línea de acordes
-        spans.add(TextSpan(
-          text: '$line\n',
-          style: TextStyle(
-            color: Colors.orangeAccent,
-            fontWeight: FontWeight.bold,
-            fontSize: _fontSize * 0.8,
-          ),
-        ));
-      } else {
-        // Línea de letra
-        spans.add(TextSpan(
-          text: '$line\n',
-          style: TextStyle(
-            color: _isDarkMode ? Colors.white : Colors.black,
-          ),
-        ));
-      }
+    if (widget.setlist.songs.isEmpty) {
+      return const Scaffold(
+        body: Center(child: Text('El setlist está vacío.')),
+      );
     }
 
-    return TextSpan(children: spans);
-  }
+    final currentItem = widget.setlist.songs[_currentIndex];
+    final songProvider = Provider.of<SongProvider>(context, listen: false);
 
-  Widget _buildControls(bool isSetlist) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: _isDarkMode ? Colors.grey[900] : Colors.grey[100],
-        border: Border(
-          top: BorderSide(
-            color: _isDarkMode ? Colors.grey[700]! : Colors.grey[300]!,
+    songProvider.setSelectedSetlistItem(currentItem, _currentIndex);
+
+    return WillPopScope(
+      onWillPop: () async {
+        songProvider.clearSetlistItem();
+        return true;
+      },
+      child: Scaffold(
+        body: SafeArea(
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: _previousSong, // Usar la nueva función
+                    ),
+                    Text(
+                      '${_currentIndex + 1} de ${widget.setlist.songs.length}',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.arrow_forward),
+                      onPressed: _nextSong, // Usar la nueva función
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: PresentationScreen(
+                  song: currentItem.song,
+                  onNextSong: _nextSong, // Pasar la función
+                  onPreviousSong: _previousSong, // Pasar la función
+                ),
+              ),
+            ],
           ),
         ),
-      ),
-      child: Column(
-        children: [
-          // Fila 1: Navegación y scroll
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              // Navegación anterior
-              if (isSetlist)
-                IconButton(
-                  icon: Icon(Icons.skip_previous, color: _isDarkMode ? Colors.white : Colors.black),
-                  onPressed: _previousSong,
-                  iconSize: 30,
-                )
-              else
-                const SizedBox(width: 48),
-              
-              // Control de scroll automático
-              Column(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      _isScrolling ? Icons.pause : Icons.play_arrow,
-                      color: _isDarkMode ? Colors.white : Colors.black,
-                      size: 30,
-                    ),
-                    onPressed: _toggleScroll,
-                  ),
-                  Text(
-                    _isScrolling ? 'Pausar' : 'Scroll',
-                    style: TextStyle(
-                      color: _isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-              
-              // Velocidad de scroll
-              Column(
-                children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.remove, color: _isDarkMode ? Colors.white : Colors.black, size: 20),
-                        onPressed: () {
-                          setState(() {
-                            _scrollSpeed = (_scrollSpeed - 0.1).clamp(0.5, 2.0);
-                          });
-                        },
-                      ),
-                      Text(
-                        '${_scrollSpeed.toStringAsFixed(1)}x',
-                        style: TextStyle(
-                          color: _isDarkMode ? Colors.white : Colors.black,
-                          fontSize: 14,
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.add, color: _isDarkMode ? Colors.white : Colors.black, size: 20),
-                        onPressed: () {
-                          setState(() {
-                            _scrollSpeed = (_scrollSpeed + 0.1).clamp(0.5, 2.0);
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                  Text(
-                    'Velocidad',
-                    style: TextStyle(
-                      color: _isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-              
-              // Navegación siguiente
-              if (isSetlist)
-                IconButton(
-                  icon: Icon(Icons.skip_next, color: _isDarkMode ? Colors.white : Colors.black),
-                  onPressed: _nextSong,
-                  iconSize: 30,
-                )
-              else
-                const SizedBox(width: 48),
-            ],
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Fila 2: Ajustes de visualización y transposición
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              // Tamaño de fuente
-              Column(
-                children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.text_decrease, color: _isDarkMode ? Colors.white : Colors.black, size: 20),
-                        onPressed: () {
-                          setState(() {
-                            _fontSize = (_fontSize - 2).clamp(16.0, 32.0);
-                          });
-                        },
-                      ),
-                      Text(
-                        'Aa',
-                        style: TextStyle(
-                          color: _isDarkMode ? Colors.white : Colors.black,
-                          fontSize: 14,
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.text_increase, color: _isDarkMode ? Colors.white : Colors.black, size: 20),
-                        onPressed: () {
-                          setState(() {
-                            _fontSize = (_fontSize + 2).clamp(16.0, 32.0);
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                  Text(
-                    'Texto',
-                    style: TextStyle(
-                      color: _isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-              
-              // Transposición
-              Column(
-                children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.arrow_downward, color: _isDarkMode ? Colors.white : Colors.black, size: 20),
-                        onPressed: () {
-                          _changeTransposicion(_currentTransposicion - 1);
-                        },
-                      ),
-                      Text(
-                        _currentTransposicion == 0 
-                            ? 'Tono' 
-                            : '${_currentTransposicion > 0 ? '+' : ''}$_currentTransposicion',
-                        style: TextStyle(
-                          color: _isDarkMode ? Colors.white : Colors.black,
-                          fontSize: 14,
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.arrow_upward, color: _isDarkMode ? Colors.white : Colors.black, size: 20),
-                        onPressed: () {
-                          _changeTransposicion(_currentTransposicion + 1);
-                        },
-                      ),
-                    ],
-                  ),
-                  Text(
-                    'Transp.',
-                    style: TextStyle(
-                      color: _isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-              
-              // Capo
-              Column(
-                children: [
-                  Row(
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.remove, color: _isDarkMode ? Colors.white : Colors.black, size: 20),
-                        onPressed: () {
-                          _changeCapo((_currentCapo - 1).clamp(0, 12));
-                        },
-                      ),
-                      Text(
-                        _currentCapo == 0 ? 'Sin capo' : 'Capo $_currentCapo',
-                        style: TextStyle(
-                          color: _isDarkMode ? Colors.white : Colors.black,
-                          fontSize: 14,
-                        ),
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.add, color: _isDarkMode ? Colors.white : Colors.black, size: 20),
-                        onPressed: () {
-                          _changeCapo((_currentCapo + 1).clamp(0, 12));
-                        },
-                      ),
-                    ],
-                  ),
-                  Text(
-                    'Capo',
-                    style: TextStyle(
-                      color: _isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-              
-              // Tema claro/oscuro
-              Column(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      _isDarkMode ? Icons.light_mode : Icons.dark_mode,
-                      color: _isDarkMode ? Colors.white : Colors.black,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _isDarkMode = !_isDarkMode;
-                      });
-                    },
-                  ),
-                  Text(
-                    _isDarkMode ? 'Oscuro' : 'Claro',
-                    style: TextStyle(
-                      color: _isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-              
-              // Botón de salir
-              Column(
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.close, color: _isDarkMode ? Colors.white : Colors.black),
-                    onPressed: () {
-                      Navigator.pop(context);
-                    },
-                  ),
-                  Text(
-                    'Salir',
-                    style: TextStyle(
-                      color: _isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

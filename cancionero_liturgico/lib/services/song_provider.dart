@@ -1,78 +1,177 @@
 import 'package:flutter/foundation.dart';
-import '../models/song.dart';
-import 'song_repository.dart';
-import '../utils/transpose_helper.dart';
+import 'package:cancionero_liturgico/models/song.dart';
+import 'package:cancionero_liturgico/models/setlist_model.dart'; // Importa SetlistItem
+import 'package:cancionero_liturgico/services/song_repository.dart'; // Import SongRepository
 
 class SongProvider with ChangeNotifier {
-  final SongRepository _repository = SongRepository();
+  Song? _selectedSong;
+  SetlistItem? _selectedSetlistItem; // Nuevo: para manejar canción con config específica en setlist
+  int _currentSetlistIndex = -1; // Nuevo: índice de la canción actual en el setlist
+
+  // SOLUCIÓN: Añadir una lista maestra de todas las canciones.
   List<Song> _songs = [];
-  int _transposition = 0;
+  // SOLUCIÓN: Añadir un indicador de carga para la lista maestra.
+  bool _isLoadingSongs = false;
 
+  // SOLUCIÓN: Getter para la lista maestra de canciones.
   List<Song> get songs => _songs;
-  int get transposition => _transposition;
+  // SOLUCIÓN: Getter para las canciones favoritas de la lista maestra.
+  List<Song> get favoriteSongs => _songs.where((song) => song.isFavorite).toList();
+  // SOLUCIÓN: Getter para el estado de carga.
+  bool get isLoadingSongs => _isLoadingSongs;
 
-  SongProvider() {
-    _initializeData();
+  // SOLUCIÓN: Método para cargar todas las canciones en el provider.
+  Future<void> loadSongs(SongRepository repository) async {
+    if (_isLoadingSongs) return; // Evitar cargas simultáneas.
+    _isLoadingSongs = true;
+    notifyListeners(); // Notificar que la carga ha comenzado.
+    try {
+      _songs = await repository.getAllSongs();
+    } catch (e) {
+      print("Error al cargar canciones en SongProvider: $e");
+    } finally {
+      _isLoadingSongs = false;
+      notifyListeners(); // Notificar que la carga ha terminado y la lista está actualizada.
+    }
   }
 
-  Future<void> _initializeData() async {
-    await _repository.addSampleSongs(); // ← AGREGAR ESTA LÍNEA
-    await loadSongs();
+  // Getters para la canción actualmente mostrada/activa
+  Song? get currentSong {
+    // Si hay un SetlistItem seleccionado, devuelve la canción transpuesta/ajustada de ahí
+    if (_selectedSetlistItem != null) {
+      // Opcional: Crear una copia temporal de la canción con el contenido transpuesto
+      // Esto evita modificar el objeto original, pero puede ser ineficiente si se llama frecuentemente.
+      // Una alternativa es calcular la transposición en la vista o en un servicio al mostrarla.
+      // Por ahora, devolvemos la canción original del SetlistItem.
+      // El contenido transpuesto se debería calcular en la vista o en un helper.
+      return _selectedSetlistItem!.song;
+    }
+    // Si no hay setlist activo, devuelve la canción seleccionada individualmente
+    return _selectedSong;
   }
 
-  Future<void> loadSongs() async {
-    _songs = await _repository.getAllSongs();
+  // Nuevo getter para acceder al SetlistItem completo
+  SetlistItem? get currentSetlistItem => _selectedSetlistItem;
+
+  // Nuevo getter: Transposición aplicada a la canción actual (0 si es individual, personalizada si es de setlist)
+  int get currentTransposition {
+    if (_selectedSetlistItem != null) {
+      return _selectedSetlistItem!.transposition;
+    }
+    // Si se guarda una transposición global temporalmente en SongProvider para canciones individuales:
+    // return _globalTranspositionForSelectedSong ?? 0;
+    // Por ahora, asumimos 0 para canciones individuales no transpuestas globalmente aquí.
+    return 0;
+  }
+
+  // Nuevo getter: Capo aplicado a la canción actual (null si es individual o no se usa, personalizado si es de setlist)
+  int? get currentCapo {
+     if (_selectedSetlistItem != null) {
+      return _selectedSetlistItem!.capo;
+    }
+    // Si se guarda un capo global temporalmente en SongProvider para canciones individuales:
+    // return _globalCapoForSelectedSong;
+    // Por ahora, asumimos null para canciones individuales no configuradas globalmente aquí.
+    return null;
+  }
+
+  // Nuevo getter: Indica si la canción actual forma parte de un setlist
+  bool get isCurrentSongFromSetlist => _selectedSetlistItem != null;
+
+  // Nuevo getter: Nombre del setlist actual (si aplica)
+  String? get currentSetlistName => _selectedSetlistItem?.song.title; // Usar nombre del setlist si está disponible en SetlistItem o se guarda por separado
+
+  // Nuevo getter: Índice de la canción actual en el setlist (si aplica)
+  int get currentSetlistIndex => _currentSetlistIndex;
+
+  // Nuevo getter: Total de canciones en el setlist activo (si aplica)
+  // Este getter requiere que se almacene la lista completa del setlist activo
+  // o que se calcule desde donde se activó el setlist.
+  // Por ahora, lo dejamos como un placeholder o se implementa cuando se maneje el setlist completo en el provider.
+  // int get currentSetlistTotal => _currentSetlist?.songs.length ?? 0;
+
+  // Métodos para seleccionar una canción individual
+  // SOLUCIÓN: Modificado para también actualizar la canción en la lista maestra si existe.
+  void setSelectedSong(Song? song) {
+    // Optimización: No notificar si la canción seleccionada es la misma.
+    if (_selectedSong == song) return;
+
+    _selectedSong = song;
+    _selectedSetlistItem = null; // Limpiar selección de setlist
+    _currentSetlistIndex = -1; // Reiniciar índice
+
+    // SOLUCIÓN: Si la canción seleccionada es una actualización de una canción en la lista maestra,
+    // actualizarla también en la lista maestra para mantener la consistencia.
+    if (song != null && song.id != null) {
+      updateSongInList(song); // Reutilizar el método de actualización de lista.
+    }
     notifyListeners();
   }
 
-  Future<void> addSong(Song song) async {
-    await _repository.insertSong(song);
-    await loadSongs();
-  }
-
-  Future<void> updateSong(Song song) async {
-    await _repository.updateSong(song);
-    await loadSongs();
-  }
-
-  Future<void> deleteSong(int id) async {
-    await _repository.deleteSong(id);
-    await loadSongs();
-  }
-
-  Future<List<Song>> searchSongs(String query) async {
-    if (query.isEmpty) {
-      return _songs;
+  // SOLUCIÓN: Nuevo método para actualizar una canción específica en la lista maestra.
+  void updateSongInList(Song updatedSong) {
+    final index = _songs.indexWhere((song) => song.id == updatedSong.id);
+    if (index != -1) {
+      _songs[index] = updatedSong;
+      notifyListeners(); // Notificar a los oyentes (SongListScreen, FavoritesScreen)
     }
-    return await _repository.searchSongs(query);
+    // Si la canción actualizada es la actualmente seleccionada, también actualizar _selectedSong
+    if (_selectedSong?.id == updatedSong.id) _selectedSong = updatedSong;
   }
 
-  // Transposición
-  void transposeUp() {
-    if (_transposition < 11) {
-      _transposition++;
-      notifyListeners();
-    }
-  }
+  void clearSelectedSong() {
+    // Optimización: Solo notificar si realmente había una canción seleccionada.
+    if (_selectedSong == null && _selectedSetlistItem == null) return;
 
-  void transposeDown() {
-    if (_transposition > -11) {
-      _transposition--;
-      notifyListeners();
-    }
-  }
-
-  void resetTransposition() {
-    _transposition = 0;
+    _selectedSong = null;
+    _selectedSetlistItem = null;
+    _currentSetlistIndex = -1;
     notifyListeners();
   }
 
-  String getTransposedLyrics(String originalLyrics) {
-    return TransposeHelper.transposeLyrics(originalLyrics, _transposition);
+  // SOLUCIÓN: Nuevo método para obtener una canción por ID de la lista maestra.
+  Song? getSongById(int songId) {
+    try {
+      return _songs.firstWhere((song) => song.id == songId);
+    } catch (e) {
+      return null;
+    }
+    notifyListeners();
   }
 
-  String getCurrentKey(String originalKey) {
-    if (_transposition == 0) return originalKey;
-    return TransposeHelper.transposeChord(originalKey, _transposition);
+  // Métodos para seleccionar una canción dentro de un setlist
+  void setSelectedSetlistItem(SetlistItem? item, int index) {
+    // Optimización: No notificar si el ítem del setlist es el mismo.
+    if (_selectedSetlistItem == item && _currentSetlistIndex == index) return;
+
+    _selectedSetlistItem = item;
+    _currentSetlistIndex = index;
+    _selectedSong = null; // Limpiar selección individual
+    notifyListeners();
   }
+
+  // Nuevo método: Limpiar estado de setlist activo
+  void clearSetlistItem() {
+    _selectedSetlistItem = null;
+    _currentSetlistIndex = -1;
+    // Opcionalmente, si se desea volver a una canción individual previamente seleccionada:
+    // No se limpia _selectedSong aquí a menos que se desee.
+    notifyListeners();
+  }
+
+  // Nuevo método: Navegar a la canción anterior en el setlist activo
+  // Este método necesitaría recibir la lista completa del setlist para calcular el índice anterior
+  // y llamar a setSelectedSetlistItem.
+  // void goToPreviousSetlistItem(List<SetlistItem> currentSetlist) {
+  //   if (_currentSetlistIndex > 0 && currentSetlist.length > _currentSetlistIndex) {
+  //     setSelectedSetlistItem(currentSetlist[_currentSetlistIndex - 1], _currentSetlistIndex - 1);
+  //   }
+  // }
+
+  // Nuevo método: Navegar a la canción siguiente en el setlist activo
+  // void goToNextSetlistItem(List<SetlistItem> currentSetlist) {
+  //   if (_currentSetlistIndex < currentSetlist.length - 1) {
+  //     setSelectedSetlistItem(currentSetlist[_currentSetlistIndex + 1], _currentSetlistIndex + 1);
+  //   }
+  // }
 }

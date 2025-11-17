@@ -1,468 +1,247 @@
-import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
-import '../models/song.dart';
+import 'package:cancionero_liturgico/models/song.dart';
+import 'package:cancionero_liturgico/services/database_helper.dart';
 
 class SongRepository {
-  static Database? _database;
-  static const String _tableName = 'songs';
+  final DatabaseHelper _databaseHelper = DatabaseHelper();
 
-  Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDatabase();
-    return _database!;
-  }
+  static const String _songColumns = '''
+    s.id, s.titulo, s.autor, s.letra_con_acordes, s.tonalidad_original,
+    s.tempo_bpm, s.posicion_capo, s.es_favorita, s.contador_reproducciones,
+    s.fecha_creacion, s.fecha_modificacion, s.notas, s.enlaces_video, s.preferred_font_size
+  ''';
 
-  Future<Database> _initDatabase() async {
-    final databasePath = await getDatabasesPath();
-    final path = join(databasePath, 'cancionero.db');
-
-    return await openDatabase(
-      path,
-      version: 1,
-      onCreate: _createDatabase,
-    );
-  }
-
-  Future<void> _createDatabase(Database db, int version) async {
-    await db.execute('''
-      CREATE TABLE $_tableName (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        artist TEXT,
-        lyricsWithChords TEXT NOT NULL,
-        originalKey TEXT NOT NULL,
-        tempoBpm INTEGER,
-        capoPosition INTEGER DEFAULT 0,
-        isFavorite INTEGER DEFAULT 0,
-        createdAt INTEGER NOT NULL,
-        updatedAt INTEGER NOT NULL
-      )
-    ''');
-  }
-
-  // CRUD Operations
-  Future<int> insertSong(Song song) async {
-    final db = await database;
-    return await db.insert(_tableName, song.toMap());
-  }
-
+  // --- CRUD Canciones ---
   Future<List<Song>> getAllSongs() async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      _tableName,
-      orderBy: 'title ASC',
-    );
-    return List.generate(maps.length, (i) => Song.fromMap(maps[i]));
-  }
+    final db = await _databaseHelper.database;
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT 
+        $_songColumns,
+        GROUP_CONCAT(cc.categoria_id) as categoria_ids
+      FROM songs s
+      LEFT JOIN cancion_categoria cc ON s.id = cc.cancion_id
+      GROUP BY s.id
+    ''');
 
-  Future<Song?> getSongById(int id) async {
-    final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      _tableName,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-    if (maps.isNotEmpty) {
-      return Song.fromMap(maps.first);
+    List<Song> songs = [];
+    for (var map in maps) {
+      final song = Song.fromMap(map);
+      songs.add(song);
     }
-    return null;
+    return songs;
   }
 
-  Future<int> updateSong(Song song) async {
-    final db = await database;
-    return await db.update(
-      _tableName,
-      song.toMap(),
-      where: 'id = ?',
-      whereArgs: [song.id],
-    );
+  Future<List<Song>> getSongsByCategory(int categoryId) async {
+    final db = await _databaseHelper.database;
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT 
+        $_songColumns,
+        GROUP_CONCAT(cc.categoria_id) as categoria_ids
+      FROM songs s
+      INNER JOIN cancion_categoria cc ON s.id = cc.cancion_id
+      WHERE cc.categoria_id = ?
+      GROUP BY s.id
+    ''', [categoryId]);
+
+    List<Song> songs = [];
+    for (var map in maps) {
+      final song = Song.fromMap(map);
+      songs.add(song);
+    }
+    return songs;
   }
 
-  Future<int> deleteSong(int id) async {
-    final db = await database;
-    return await db.delete(
-      _tableName,
-      where: 'id = ?',
-      whereArgs: [id],
-    );
+  Future<List<Song>> getSongsByCategories(List<int> categoryIds) async {
+    if (categoryIds.isEmpty) return getAllSongs();
+
+    final db = await _databaseHelper.database;
+    final placeholders = List.filled(categoryIds.length, '?').join(',');
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT 
+        $_songColumns,
+        GROUP_CONCAT(cc.categoria_id) as categoria_ids
+      FROM songs s
+      INNER JOIN cancion_categoria cc ON s.id = cc.cancion_id
+      WHERE cc.categoria_id IN ($placeholders)
+      GROUP BY s.id
+    ''', categoryIds);
+
+    List<Song> songs = [];
+    for (var map in maps) {
+      final song = Song.fromMap(map);
+      songs.add(song);
+    }
+    return songs;
   }
 
   Future<List<Song>> searchSongs(String query) async {
-    final db = await database;
+    if (query.isEmpty) return getAllSongs();
+
+    final db = await _databaseHelper.database;
+    final lowerQuery = query.toLowerCase();
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT 
+        $_songColumns,
+        GROUP_CONCAT(cc.categoria_id) as categoria_ids
+      FROM songs s
+      LEFT JOIN cancion_categoria cc ON s.id = cc.cancion_id
+      WHERE LOWER(s.titulo) LIKE ? 
+         OR LOWER(s.autor) LIKE ? 
+         OR LOWER(s.letra_con_acordes) LIKE ? 
+         OR LOWER(s.notas) LIKE ?
+      GROUP BY s.id
+    ''', ['%$lowerQuery%', '%$lowerQuery%', '%$lowerQuery%', '%$lowerQuery%']);
+
+    List<Song> songs = [];
+    for (var map in maps) {
+      final song = Song.fromMap(map);
+      songs.add(song);
+    }
+    return songs;
+  }
+
+  Future<List<Song>> getFavoriteSongs() async {
+    final db = await _databaseHelper.database;
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT 
+        $_songColumns,
+        GROUP_CONCAT(cc.categoria_id) as categoria_ids
+      FROM songs s
+      LEFT JOIN cancion_categoria cc ON s.id = cc.cancion_id
+      WHERE s.es_favorita = 1
+      GROUP BY s.id
+    ''');
+
+    List<Song> songs = [];
+    for (var map in maps) {
+      final song = Song.fromMap(map);
+      songs.add(song);
+    }
+    return songs;
+  }
+
+  Future<Song?> getSongById(int songId) async {
+    final db = await _databaseHelper.database;
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT 
+        $_songColumns,
+        GROUP_CONCAT(cc.categoria_id) as categoria_ids
+      FROM songs s
+      LEFT JOIN cancion_categoria cc ON s.id = cc.cancion_id
+      WHERE s.id = ?
+      GROUP BY s.id
+    ''', [songId]);
+
+    if (maps.isNotEmpty) {
+      final song = Song.fromMap(maps.first);
+      return song;
+    }
+
+    return null;
+  }
+
+  Future<int> insertSong(Song song) async {
+    final db = await _databaseHelper.database;
+    print("🎵 INSERT SONG: '${song.title}' con ${song.categoryIds.length} categorías");
+    final int songId = await db.transaction((txn) async {
+      return await txn.insert('songs', song.toMap());
+    });
+    // Debug de categorías después de insertar
+    final categoriasDebug = await db.query('cancion_categoria', where: 'cancion_id = ?', whereArgs: [songId]);
+    print("🏷️  RELACIONES CREADAS: ${categoriasDebug.length} para canción $songId");
+    return songId;
+  }
+
+  Future<void> updateSong(Song song) async {
+    if (song.id == null) return;
+
+    final db = await _databaseHelper.database;
+    await db.transaction((txn) async {
+      await txn.update('songs', song.toMap(), where: 'id = ?', whereArgs: [song.id]);
+    });
+  }
+
+  Future<void> deleteSong(int id) async {
+    final db = await _databaseHelper.database;
+    await db.delete('songs', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<void> setCategoriasForSong(int songId, List<int> categoryIds) async {
+    final db = await _databaseHelper.database;
+    await db.transaction((txn) async {
+      await txn.delete('cancion_categoria', where: 'cancion_id = ?', whereArgs: [songId]);
+
+      for (int catId in categoryIds) {
+        await txn.insert('cancion_categoria', {
+          'cancion_id': songId,
+          'categoria_id': catId,
+        });
+      }
+    });
+  }
+
+  Future<List<int>> getCategoriaIdsForSong(int songId) async {
+    final db = await _databaseHelper.database;
     final List<Map<String, dynamic>> maps = await db.query(
-      _tableName,
-      where: 'title LIKE ? OR artist LIKE ? OR lyricsWithChords LIKE ?',
-      whereArgs: ['%$query%', '%$query%', '%$query%'],
-      orderBy: 'title ASC',
+      'cancion_categoria',
+      columns: ['categoria_id'],
+      where: 'cancion_id = ?',
+      whereArgs: [songId],
     );
-    return List.generate(maps.length, (i) => Song.fromMap(maps[i]));
+    return maps.map((map) => map['categoria_id'] as int).toList();
   }
 
-  Future<void> close() async {
-    final db = await database;
-    db.close();
+  Future<void> toggleFavorite(int songId) async {
+    final db = await _databaseHelper.database;
+    // SOLUCIÓN: Usar una única consulta atómica para invertir el estado de favorito
+    // y actualizar la fecha de modificación.
+    await db.rawUpdate('''
+      UPDATE songs 
+      SET es_favorita = CASE WHEN es_favorita = 1 THEN 0 ELSE 1 END,
+          fecha_modificacion = ?
+      WHERE id = ?
+    ''', [DateTime.now().toIso8601String(), songId]);
   }
 
-  Future<void> addSampleSongs() async {
-  final db = await database;
-  
-  // Verificar si ya existen canciones
-  final count = Sqflite.firstIntValue(
-    await db.rawQuery('SELECT COUNT(*) FROM $_tableName')
-  );
-  
-  if (count! > 0) return; // Ya hay canciones, no agregar muestras
-  
-  // CANCIONES MÁS LARGAS PARA PROBAR SCROLL
-  final sampleSongs = [
-    Song(
-      title: "Alabado Sea el Señor",
-      artist: "Juan Pérez",
-      lyricsWithChords: """
-    C          G           Am
-Alabado sea el Señor nuestro Dios
-    F         C           G
-Por su inmenso amor y compasión
-
-    C          Em         F
-Gloria al Padre, gloria al Hijo
-    G          C          G
-Y gloria al Espíritu Santo
-
-    Am        Em         F
-Te damos gracias por tu gran bondad
-    C          G          C
-Por tu misericordia y tu verdad
-
-    F         C          G
-Cantamos con alegría y devoción
-    Am        F          G
-Elevamos nuestras voces en oración
-
-    C          G           Am
-En la mañana al despertar
-    F         C           G
-Tu nombre quiero glorificar
-
-    C          Em         F
-En el trabajo y en el descanso
-    G          C          G
-Tu presencia es mi regalo
-
-    Am        Em         F
-En los momentos de dificultad
-    C          G          C
-Eres mi fuerza y mi bondad
-
-    F         C          G
-Cuando la noche llega al final
-    Am        F          G
-Contigo quiero caminar
-
-    C          G           Am
-Las aves cantan tu loor
-    F         C           G
-Las flores muestran tu color
-
-    C          Em         F
-Los ríos fluyen hacia el mar
-    G          C          G
-Todo te quiere alabar
-
-    Am        Em         F
-Las montañas altas y el valle
-    C          G          C
-Proclaman que tú eres grande
-
-    F         C          G
-El sol, la luna y las estrellas
-    Am        F          G
-Cuentan tus obras tan bellas
-
-    C          G           Am
-Por todo lo que has creado
-    F         C           G
-Sea tu nombre ensalzado
-
-    C          Em         F
-Hoy y por la eternidad
-    G          C          C7
-Te alabamos de verdad
-      """,
-      originalKey: "C",
-      tempoBpm: 120,
-    ),
-    Song(
-      title: "Gloria a Dios en el Cielo",
-      artist: "María García",
-      lyricsWithChords: """
-    G          D          Em
-Gloria a Dios en el cielo
-    C          G          D
-Y en la tierra paz a los hombres
-
-    Em         C          G
-Te alabamos, te bendecimos
-    D          G          C
-Te adoramos, te glorificamos
-
-    G          D          Em
-Por tu inmensa gloria te damos gracias
-    C          G          D
-Señor Dios, Rey celestial
-
-    Em         C          G
-Dios Padre todopoderoso
-    D          G          C
-Señor, Hijo único, Jesucristo
-
-    G          D          Em
-Señor Dios, Cordero de Dios
-    C          G          D
-Hijo del Padre
-
-    Em         C          G
-Tú que quitas el pecado del mundo
-    D          G          C
-Ten piedad de nosotros
-
-    G          D          Em
-Tú que quitas el pecado del mundo
-    C          G          D
-Atiende nuestra súplica
-
-    Em         C          G
-Tú que estás a la derecha del Padre
-    D          G          C
-Ten piedad de nosotros
-
-    G          D          Em
-Porque sólo tú eres Santo
-    C          G          D
-Sólo tú Señor
-
-    Em         C          G
-Sólo tú Altísimo, Jesucristo
-    D          G          C
-Con el Espíritu Santo
-
-    G          D          Em
-En la gloria de Dios Padre
-    C          G          D
-Amén, amén, aleluya
-
-    Em         C          G
-Los ángeles cantan tu gloria
-    D          G          C
-Los santos te adoran
-
-    G          D          Em
-Los mártires proclaman tu nombre
-    C          G          D
-La iglesia te venera
-
-    Em         C          G
-Desde el oriente hasta el occidente
-    D          G          C
-Tu nombre es alabado
-
-    G          D          Em
-De generación en generación
-    C          G          D
-Tu amor permanece
-
-    Em         C          G
-Por los siglos de los siglos
-    D          G          C
-Tu reino no tendrá fin
-      """,
-      originalKey: "G",
-      tempoBpm: 110,
-    ),
-    Song(
-      title: "Santo, Santo, Santo",
-      artist: "Comunidad de Fe",
-      lyricsWithChords: """
-    D          A          Bm
-Santo, santo, santo es el Señor
-    G          D          A
-Dios del universo, lleno está el cielo
-
-    Bm         G          D
-Bendito el que viene en nombre del Señor
-    A          D          G
-Hosanna en las alturas, hosanna
-
-    D          A          Bm
-Los cielos y la tierra proclaman tu gloria
-    G          D          A
-Los mares y los ríos cantan tu victoria
-
-    Bm         G          D
-Las montañas elevan su canto a ti
-    A          D          G
-Y los valles repiten tu nombre aquí
-
-    D          A          Bm
-Santo eres desde la eternidad
-    G          D          A
-Y por siempre santo serás
-
-    Bm         G          D
-Antes que el mundo existiera
-    A          D          G
-Ya eras Dios y Rey de la tierra
-
-    D          A          Bm
-Los querubines y serafines
-    G          D          A
-Cubren sus rostros ante ti
-
-    Bm         G          D
-Y cantan sin cesar día y noche
-    A          D          G
-Santo, santo, santo es el Señor
-
-    D          A          Bm
-Tu trono está fundado en justicia
-    G          D          A
-Y en juicio tu reino permanece
-
-    Bm         G          D
-Tu manto es la luz y la verdad
-    A          D          G
-Tu cetro es amor y bondad
-
-    D          A          Bm
-Los ancianos se postran ante ti
-    G          D          A
-Y depositan sus coronas
-
-    Bm         G          D
-Reconociendo que sólo tú
-    A          D          G
-Eres digno de toda alabanza
-
-    D          A          Bm
-Las naciones vendrán a adorarte
-    G          D          A
-Y los pueblos a glorificarte
-
-    Bm         G          D
-Porque grande eres y haces maravillas
-    A          D          G
-Tú solo eres Dios, no hay otro
-
-    D          A          Bm
-Santo, santo, santo
-    G          D          A
-Mereces toda la honra
-
-    Bm         G          D
-Santo, santo, santo
-    A          D          G
-Mereces toda la gloria
-
-    D          A          Bm
-Santo, santo, santo
-    G          D          A
-Mereces toda alabanza
-
-    Bm         G          D
-Por los siglos de los siglos
-    A          D          G
-Amén, amén, aleluya
-      """,
-      originalKey: "D",
-      tempoBpm: 90,
-    ),
-    Song(
-      title: "Cordero de Dios",
-      artist: "Coros Litúrgicos",
-      lyricsWithChords: """
-    Am         E7         Am
-Cordero de Dios que quitas el pecado
-    G          C          E7
-Ten piedad de nosotros, ten piedad
-
-    Am         E7         Am
-Cordero de Dios que quitas el pecado
-    G          C          E7
-Danos la paz, danos la paz
-
-    Am         E7         Am
-Tú que fuiste inmolado por nosotros
-    G          C          E7
-En la cruz del Calvario moriste
-
-    Am         E7         Am
-Para darnos vida eterna
-    G          C          E7
-Y limpiarnos de toda culpa
-
-    Am         E7         Am
-Tu sangre preciosa nos redime
-    G          C          E7
-Tu sacrificio nos salva
-
-    Am         E7         Am
-No hay otro nombre bajo el cielo
-    G          C          E7
-En el cual podamos ser salvos
-
-    Am         E7         Am
-Sólo en ti, Jesús, hay perdón
-    G          C          E7
-Sólo en ti hay redención
-
-    Am         E7         Am
-Por las llagas de tu cuerpo
-    G          C          E7
-Fuimos sanados y liberados
-
-    Am         E7         Am
-Por tu resurrección gloriosa
-    G          C          E7
-Tenemos esperanza de vida
-
-    Am         E7         Am
-Cordero inmolado desde la fundación
-    G          C          E7
-Del mundo, tú eres digno
-
-    Am         E7         Am
-De recibir el poder y las riquezas
-    G          C          E7
-La sabiduría y la fortaleza
-
-    Am         E7         Am
-La honra, la gloria y la alabanza
-    G          C          E7
-Por siempre y para siempre
-
-    Am         E7         Am
-Todas las criaturas en el cielo
-    G          C          E7
-Y en la tierra y debajo de la tierra
-
-    Am         E7         Am
-Y en el mar, a ti sea la alabanza
-    G          C          E7
-Y la honra y la gloria y el poder
-
-    Am         E7         Am
-Por los siglos de los siglos
-    G          C          E7
-Amén, aleluya, amén
-      """,
-      originalKey: "Am",
-      tempoBpm: 70,
-    ),
-  ];
-
-  // Insertar canciones de ejemplo
-  for (final song in sampleSongs) {
-    await db.insert(_tableName, song.toMap());
+  Future<void> incrementPlayCount(int songId) async {
+    final db = await _databaseHelper.database;
+    await db.rawUpdate('''
+      UPDATE songs 
+      SET contador_reproducciones = contador_reproducciones + 1, 
+          fecha_modificacion = ? 
+      WHERE id = ?
+    ''', [DateTime.now().toIso8601String(), songId]);
   }
-}
+
+  // Nuevo método para obtener canciones modificadas después de una fecha (usado por SyncService)
+  Future<List<Song>> getModifiedSongsAfter(DateTime date) async {
+    final db = await _databaseHelper.database;
+    final List<Map<String, dynamic>> maps = await db.rawQuery('''
+      SELECT 
+        $_songColumns,
+        GROUP_CONCAT(cc.categoria_id) as categoria_ids
+      FROM songs s
+      LEFT JOIN cancion_categoria cc ON s.id = cc.cancion_id
+      WHERE s.fecha_modificacion > ?
+      GROUP BY s.id
+    ''', [date.toIso8601String()]);
+
+    List<Song> songs = [];
+    for (var map in maps) {
+      final song = Song.fromMap(map);
+      songs.add(song);
+    }
+    return songs;
+  }
+
+  // Nuevo método para verificar si una canción existe (usado por SyncService)
+  Future<bool> songExists(int songId) async {
+    final db = await _databaseHelper.database;
+    final result = await db.query(
+      'songs',
+      columns: ['id'],
+      where: 'id = ?',
+      whereArgs: [songId],
+    );
+    return result.isNotEmpty;
+  }
 }

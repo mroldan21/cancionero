@@ -9,17 +9,21 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.8
+  connectivity_plus: ^6.0.3
+  cupertino_icons: ^1.0.8  
   sqflite: ^2.3.0
   path: ^1.8.3
   provider: ^6.1.1
-  share_plus: ^7.0.0
-  file_picker: ^5.0.0
-  wakelock_plus: ^1.0.1
-  scroll_to_index: ^2.0.0
   json_annotation: ^4.8.1
-  uuid: ^4.2.1
-  equatable: ^2.0.5
+  shared_preferences: ^2.2.2 # Asegúrate de usar la última versión compatible
+
+  # También necesitas wakelock_plus para el modo presentación
+  wakelock_plus: ^1.2.5
+  device_info_plus: ^9.0.0
+  http: ^1.1.0
+  collection: ^1.18.0
+
+  
 
 dev_dependencies:
   flutter_test:
@@ -30,3 +34,4 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
