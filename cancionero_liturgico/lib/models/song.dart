@@ -16,6 +16,12 @@ class Song {
   final List<String>? videoLinks;
   final double? preferredFontSize;
   final List<int> categoryIds; // Nuevo campo para almacenar los IDs de las categorías
+  // AGREGAR:
+  final bool activo;
+  final String estado; // 'pendiente','borrador','aprobado','inactivo'
+  final String? fuente;
+  final String? hashContenido;
+  final int version;
 
   Song({
     this.id,
@@ -33,6 +39,12 @@ class Song {
     this.videoLinks,
     this.preferredFontSize,
     this.categoryIds = const [], // Valor por defecto
+    // AGREGAR:
+    this.activo = true,
+    this.estado = 'aprobado',
+    this.fuente,
+    this.hashContenido,
+    this.version = 1,
   });
 
   factory Song.fromMap(Map<String, dynamic> map) {
@@ -58,6 +70,12 @@ class Song {
               .map((id) => int.parse(id))
               .toList() ??
           [],
+      // AGREGAR:
+      activo: (map['activo'] as int?) == 1,
+      estado: map['estado'] as String? ?? 'aprobado',
+      fuente: map['fuente'] as String?,
+      hashContenido: map['hash_contenido'] as String?,
+      version: map['version'] as int? ?? 1,
     );
   }
 
@@ -78,6 +96,12 @@ class Song {
       'enlaces_video': videoLinks?.join(','),
       'preferred_font_size': preferredFontSize,
       // 'category_ids' no se mapea a la BD directamente, se gestiona en la tabla cancion_categoria
+      // AGREGAR:
+      'activo': activo ? 1 : 0,
+      'estado': estado,
+      'fuente': fuente,
+      'hash_contenido': hashContenido,
+      'version': version,
     };
   }
 
@@ -97,6 +121,12 @@ class Song {
     List<String>? videoLinks,
     double? preferredFontSize,
     List<int>? categoryIds,
+    // AGREGAR:
+    bool? activo,
+    String? estado,
+    String? fuente,
+    String? hashContenido,
+    int? version,
   }) {
     return Song(
       id: id ?? this.id,
@@ -114,6 +144,12 @@ class Song {
       videoLinks: videoLinks ?? this.videoLinks,
       preferredFontSize: preferredFontSize ?? this.preferredFontSize,
       categoryIds: categoryIds ?? this.categoryIds,
+      // AGREGAR:
+      activo: activo ?? this.activo,
+      estado: estado ?? this.estado,
+      fuente: fuente ?? this.fuente,
+      hashContenido: hashContenido ?? this.hashContenido,
+      version: version ?? this.version,
     );
   }
 
@@ -134,7 +170,13 @@ class Song {
         other.preferredFontSize == preferredFontSize &&
         other.notes == notes &&
         listEquals(other.videoLinks, videoLinks) &&
-        listEquals(other.categoryIds, categoryIds);
+        listEquals(other.categoryIds, categoryIds) &&
+        // AGREGAR:
+        other.activo == activo &&
+        other.estado == estado &&
+        other.fuente == fuente &&
+        other.hashContenido == hashContenido &&
+        other.version == version;
   }
 
   @override
@@ -152,6 +194,12 @@ class Song {
       preferredFontSize.hashCode ^
       notes.hashCode ^
       listHash(videoLinks) ^
-      listHash(categoryIds);
+      listHash(categoryIds) ^
+      // AGREGAR:
+      activo.hashCode ^
+      estado.hashCode ^
+      fuente.hashCode ^
+      hashContenido.hashCode ^
+      version.hashCode;
   }
 }

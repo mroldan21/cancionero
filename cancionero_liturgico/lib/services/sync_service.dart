@@ -551,9 +551,13 @@ class SyncService {
         : '[]',
     'preferred_font_size': cancion.preferredFontSize.toString(),
     'contador_reproducciones': cancion.playCount,
-    'categorias': categoryNames, // ← Ahora es un array, no string
-    'version': 1,
-    'estado': 'activo',
+    'categorias': categoryNames,
+    // AGREGAR:
+    'activo': cancion.activo ? 1 : 0,
+    'estado': cancion.estado,
+    'fuente': cancion.fuente ?? 'movil',
+    'hash_contenido': cancion.hashContenido,
+    'version': cancion.version,
   };
 }
 
@@ -580,7 +584,6 @@ class SyncService {
       tempoBpm: cancionData['tempo_bpm'] as int?,
       capoPosition: (cancionData['posicion_capo'] as int?) ?? 0,
       isFavorite: (cancionData['es_favorita'] as int? ?? 0) == 1,
-      // CORRECCIÓN: Parsear de forma segura el tamaño de fuente, que puede venir como String desde PHP.
       preferredFontSize: double.tryParse(cancionData['preferred_font_size']?.toString() ?? '16.0') ?? 16.0,
       playCount: (cancionData['contador_reproducciones'] as int?) ?? 0,
       notes: cancionData['notas'],
@@ -589,7 +592,12 @@ class SyncService {
           : null,
       creationDate: DateTime.parse(cancionData['fecha_creacion'] as String),
       modificationDate: DateTime.parse(cancionData['fecha_modificacion'] as String),
-      // categoryIds se poblará después de procesar las categorías
+      // AGREGAR:
+      activo: (cancionData['activo'] as int? ?? 1) == 1,
+      estado: cancionData['estado'] as String? ?? 'aprobado',
+      fuente: cancionData['fuente'] as String?,
+      hashContenido: cancionData['hash_contenido'] as String?,
+      version: cancionData['version'] as int? ?? 1,
     );
 
     // 2. Procesar y asignar categorías
