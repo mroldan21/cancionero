@@ -695,4 +695,29 @@ class SyncService {
     }
   }
 
+  // =======================================================================
+  // MÉTODOS DE ACCIÓN DIRECTA
+  // =======================================================================
+
+  /// SOLICITUD: Envía una solicitud "fire-and-forget" para eliminar una canción en el servidor.
+  /// No espera confirmación y no bloquea la UI.
+  Future<void> borrarCancionRemotaDefinitivamente(int songId) async {
+    // La URL apunta al script que ya tiene la lógica para 'accion_directa'.
+    final url = Uri.parse('$_baseUrl/subir_cambios.php');
+    print('SYNC_SERVICE: 🔫 Enviando borrado definitivo para la canción ID: $songId');
+    try {
+      // No usamos 'await' aquí para que sea una operación "fire-and-forget".
+      http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'accion_directa': 'borrar_cancion_definitiva', 'id': songId}),
+      ).then((response) {
+        print('SYNC_SERVICE: ✅ Respuesta del borrado remoto: ${response.statusCode} ${response.body}');
+      }).catchError((e) {
+        print('SYNC_SERVICE: ❌ Error en la solicitud de borrado remoto: $e');
+      });
+    } catch (e) {
+      print('SYNC_SERVICE: ❌ Error al construir la solicitud de borrado remoto: $e');
+    }
+  }
 }

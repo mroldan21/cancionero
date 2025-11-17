@@ -28,6 +28,21 @@ try {
         ResponseHelper::sendError("Datos JSON inválidos");
     }
 
+    // --- INICIO: Lógica para acción directa de borrado definitivo ---
+    if (isset($input['accion_directa']) && $input['accion_directa'] === 'borrar_cancion_definitiva') {
+        ResponseHelper::validateRequired($input, ['id']);
+        $database = new Database();
+        $db = $database->getConnection();
+        try {
+            $filas_afectadas = borrarCancionDefinitiva($db, $input);
+            ResponseHelper::sendSuccess(['filas_afectadas_en_songs' => $filas_afectadas], "Borrado definitivo procesado.");
+        } catch (Exception $e) {
+            error_log("Error en borrado definitivo: " . $e->getMessage());
+            ResponseHelper::sendError("Error en borrado definitivo: " . $e->getMessage());
+        }
+        exit; // Terminar el script después de la acción directa
+    }
+
     ResponseHelper::validateRequired($input, ['dispositivo_id', 'cambios']);
 
     $dispositivo_id = $input['dispositivo_id'];
@@ -362,6 +377,40 @@ function eliminarCancion($db, $datos) {
     return $stmt->rowCount();
 }
 
+// --- INICIO: Nueva función para borrado definitivo ---
+function borrarCancionDefinitiva($db, $datos) {
+    error_log("===== BORRADO DEFINITIVO CANCIÓN ID: {$datos['id']} =====");
+    $cancion_id = $datos['id'];
+
+    try {
+        $db->beginTransaction();
+
+        // 1. Eliminar de 'setlist_cancion'
+        $stmt_setlist = $db->prepare("DELETE FROM setlist_cancion WHERE cancion_id = ?");
+        $stmt_setlist->execute([$cancion_id]);
+        $relaciones_setlist_eliminadas = $stmt_setlist->rowCount();
+        error_log("🗑️  Relaciones eliminadas en setlist_cancion: $relaciones_setlist_eliminadas");
+
+        // 2. Eliminar de 'cancion_categoria'
+        $stmt_cat = $db->prepare("DELETE FROM cancion_categoria WHERE cancion_id = ?");
+        $stmt_cat->execute([$cancion_id]);
+        $relaciones_cat_eliminadas = $stmt_cat->rowCount();
+        error_log("🗑️  Relaciones eliminadas en cancion_categoria: $relaciones_cat_eliminadas");
+
+        // 3. Eliminar el registro principal en 'songs'
+        $stmt_song = $db->prepare("DELETE FROM songs WHERE id = ?");
+        $stmt_song->execute([$cancion_id]);
+        $filas_afectadas = $stmt_song->rowCount();
+
+        $db->commit();
+        error_log("✅ Borrado definitivo completado para canción ID $cancion_id. Filas afectadas en 'songs': $filas_afectadas");
+        return $filas_afectadas;
+    } catch (Exception $e) {
+        $db->rollBack();
+        error_log("❌ ERROR en borrado definitivo para canción ID $cancion_id. Transacción revertida. Error: " . $e->getMessage());
+        throw $e;
+    }
+}
 // --- INICIO: Funciones para procesar Setlists ---
 
 function procesarSetlist($db, $datos, $tipo) {

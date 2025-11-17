@@ -4,6 +4,9 @@ import 'package:cancionero_liturgico/models/song.dart';
 import 'package:cancionero_liturgico/models/setlist_model.dart'; // SOLUCIÓN: Importar el modelo unificado
 import 'package:cancionero_liturgico/screens/presentation_screen.dart';
 import 'package:cancionero_liturgico/services/song_provider.dart'; // Importar SongProvider
+import 'package:cancionero_liturgico/services/sync_service.dart'; // SOLICITUD: Importar SyncService
+import 'package:cancionero_liturgico/services/category_repository.dart'; // SOLICITUD: Importar repositorios necesarios para SyncService
+import 'package:cancionero_liturgico/services/setlist_repository.dart'; // SOLICITUD: Importar repositorios necesarios para SyncService
 import 'package:cancionero_liturgico/services/transposition_service.dart';
 import 'package:cancionero_liturgico/widgets/chord_text.dart';
 import 'package:cancionero_liturgico/services/song_repository.dart';
@@ -113,10 +116,20 @@ class _SongDetailScreenState extends State<SongDetailScreen> {
       final songRepository = Provider.of<SongRepository>(context, listen: false);
       
       try {
-        // 1. Eliminar de la base de datos
+        // 1. Eliminar de la base de datos local
         await songRepository.deleteSong(currentSong.id!);
         
-        // 2. Limpiar la canción seleccionada
+        // SOLICITUD: Llamar al borrado remoto a través de SyncService
+        // Instanciamos SyncService con los repositorios necesarios
+        final syncService = SyncService(
+          songRepository: songRepository,
+          categoryRepository: Provider.of<CategoryRepository>(context, listen: false),
+          setlistRepository: Provider.of<SetlistRepository>(context, listen: false),
+        );
+        // La llamada es "fire-and-forget", no necesita await.
+        syncService.borrarCancionRemotaDefinitivamente(currentSong.id!);
+
+        // 2. Limpiar la canción seleccionada en el provider
         if (widget.setlistItems?.isNotEmpty ?? false) songProvider.clearSetlistItem();
         songProvider.clearSelectedSong();
         

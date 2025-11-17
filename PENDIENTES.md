@@ -9,4 +9,7 @@
 ## WebApp de conversión (en notebook)
 - Probar de pdf a bd formato propio
 
-#
+# Criterios para sincronización:
+- Eliminar canción local debe eliminar canción remota con endpoint.
+
+- Eliminar canción en BD, debe 
