@@ -19,7 +19,7 @@ class DatabaseHelper {
     String path = join(await getDatabasesPath(), 'cancionero.db');
     return await openDatabase(
       path,
-      version: 8, // SOLICITUD: Incrementar versión para añadir categoría y setlist de ejemplo
+      version: 9, // SOLICITUD: Incrementar versión para añadir categoría y setlist de ejemplo
       onCreate: _onCreate,
       onUpgrade: _onUpgrade, // Añadir callback de actualización
     );
@@ -28,12 +28,21 @@ class DatabaseHelper {
   // Nueva función para manejar actualizaciones de versión
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     print("[DB] _onUpgrade: Actualizando la base de datos de v$oldVersion a v$newVersion.");
-    // Para desarrollo, una estrategia simple es borrar y recrear la BD.
-    // ADVERTENCIA: Esto borrará todos los datos existentes.
-    if (oldVersion < newVersion) {
+    
+    // Migración de v8 a v9: Agregar nuevas columnas a songs
+    if (oldVersion < 9) {
+      print("[DB] _onUpgrade: Agregando columnas: activo, estado, fuente, hash_contenido, version");
+      await db.execute('ALTER TABLE songs ADD COLUMN activo INTEGER DEFAULT 1');
+      await db.execute('ALTER TABLE songs ADD COLUMN estado TEXT DEFAULT "aprobado"');
+      await db.execute('ALTER TABLE songs ADD COLUMN fuente TEXT');
+      await db.execute('ALTER TABLE songs ADD COLUMN hash_contenido TEXT');
+      await db.execute('ALTER TABLE songs ADD COLUMN version INTEGER DEFAULT 1');
+      print("[DB] ✅ Columnas agregadas exitosamente");
+    }
+    
+    // Si hay versiones anteriores que necesitan recreación completa
+    if (oldVersion < 8) {
       print("[DB] _onUpgrade: Borrando todas las tablas existentes.");
-
-      // Lista de todas las tablas para asegurar que se borren todas.
       const tables = [
         'cancion_categoria',
         'setlist_cancion',
@@ -46,8 +55,6 @@ class DatabaseHelper {
       for (final table in tables) {
         await db.execute('DROP TABLE IF EXISTS $table;');
       }
-
-      // Recrear la base de datos desde cero.
       await _onCreate(db, newVersion);
     }
   }
@@ -83,37 +90,23 @@ class DatabaseHelper {
         autor TEXT,
         letra_con_acordes TEXT NOT NULL,
         tonalidad_original TEXT NOT NULL,
-        tempo_bpm INTEGER, -- Puede ser nulo
+        tempo_bpm INTEGER,
         posicion_capo INTEGER DEFAULT 0,
-        es_favorita INTEGER DEFAULT 0, -- BOOLEANO (0=false, 1=true)
-        preferred_font_size REAL DEFAULT 16.0, -- Nuevo campo para el tamaño de fuente con valor por defecto
+        es_favorita INTEGER DEFAULT 0,
+        preferred_font_size REAL DEFAULT 16.0,
         contador_reproducciones INTEGER DEFAULT 0,
-        fecha_creacion TEXT NOT NULL, -- Almacenar como TEXT en formato ISO
-        fecha_modificacion TEXT NOT NULL, -- Almacenar como TEXT en formato ISO
+        fecha_creacion TEXT NOT NULL,
+        fecha_modificacion TEXT NOT NULL,
         notas TEXT,
-        enlaces_video TEXT -- Almacenar como CSV o JSON en un STRING
+        enlaces_video TEXT,
+        activo INTEGER DEFAULT 1,
+        estado TEXT DEFAULT 'aprobado',
+        fuente TEXT,
+        hash_contenido TEXT,
+        version INTEGER DEFAULT 1
       )
     ''');
-    print("[DEBUG] _createTables: Executing CREATE TABLE songs with schema:");
-    print('''
-      CREATE TABLE songs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        titulo TEXT NOT NULL,
-        autor TEXT,
-        letra_con_acordes TEXT NOT NULL,
-        tonalidad_original TEXT NOT NULL,
-        tempo_bpm INTEGER, -- Puede ser nulo
-        posicion_capo INTEGER DEFAULT 0,
-        es_favorita INTEGER DEFAULT 0, -- BOOLEANO (0=false, 1=true)
-        preferred_font_size REAL DEFAULT 16.0, -- Nuevo campo para el tamaño de fuente con valor por defecto
-        contador_reproducciones INTEGER DEFAULT 0,
-        fecha_creacion TEXT NOT NULL, -- Almacenar como TEXT en formato ISO
-        fecha_modificacion TEXT NOT NULL, -- Almacenar como TEXT en formato ISO
-        notas TEXT,
-        enlaces_video TEXT -- Almacenar como CSV o JSON en un STRING
-      )
-    ''');
-
+    
     // Tabla de Relación Muchos a Muchos: Canciones y Categorías
     await db.execute('''
       CREATE TABLE cancion_categoria (

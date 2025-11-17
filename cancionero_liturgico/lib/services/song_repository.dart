@@ -7,9 +7,9 @@ class SongRepository {
   static const String _songColumns = '''
     s.id, s.titulo, s.autor, s.letra_con_acordes, s.tonalidad_original,
     s.tempo_bpm, s.posicion_capo, s.es_favorita, s.contador_reproducciones,
-    s.fecha_creacion, s.fecha_modificacion, s.notas, s.enlaces_video, s.preferred_font_size
+    s.fecha_creacion, s.fecha_modificacion, s.notas, s.enlaces_video, s.preferred_font_size,
+    s.activo, s.estado, s.fuente, s.hash_contenido, s.version
   ''';
-
   // --- CRUD Canciones ---
   Future<List<Song>> getAllSongs() async {
     final db = await _databaseHelper.database;

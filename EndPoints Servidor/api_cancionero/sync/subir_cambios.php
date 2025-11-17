@@ -251,12 +251,13 @@ function crearCancionConId($db, $datos, $hash) {
     $query = "INSERT INTO songs (
                 id, titulo, autor, letra_con_acordes, tonalidad_original,
                 tempo_bpm, posicion_capo, es_favorita, preferred_font_size,
-                notas, enlaces_video, hash_contenido, fecha_creacion, fecha_modificacion
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+                notas, enlaces_video, hash_contenido, 
+                activo, estado, fuente, version, fecha_creacion, fecha_modificacion
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
 
     $stmt = $db->prepare($query);
     $result = $stmt->execute([
-        $datos['id'], // Usar el ID que viene de Flutter
+        $datos['id'],
         $datos['titulo'],
         $datos['autor'] ?? null,
         $datos['letra_con_acordes'],
@@ -267,7 +268,11 @@ function crearCancionConId($db, $datos, $hash) {
         $datos['preferred_font_size'] ?? 16.0,
         $datos['notas'] ?? null,
         $datos['enlaces_video'] ?? null,
-        $hash
+        $hash,
+        $datos['activo'] ?? 1,
+        $datos['estado'] ?? 'aprobado',
+        $datos['fuente'] ?? 'movil',
+        $datos['version'] ?? 1,
     ]);
 
     if ($result) {
@@ -295,7 +300,8 @@ function actualizarCancion($db, $cancion_id, $datos, $hash) {
     $query = "UPDATE songs SET
                 titulo = ?, autor = ?, letra_con_acordes = ?, tonalidad_original = ?,
                 tempo_bpm = ?, posicion_capo = ?, es_favorita = ?, preferred_font_size = ?,
-                notas = ?, enlaces_video = ?, hash_contenido = ?, version = version + 1,
+                notas = ?, enlaces_video = ?, hash_contenido = ?,
+                activo = ?, estado = ?, fuente = ?, version = version + 1,
                 fecha_modificacion = CURRENT_TIMESTAMP
               WHERE id = ?";
 
@@ -312,6 +318,9 @@ function actualizarCancion($db, $cancion_id, $datos, $hash) {
         $datos['notas'] ?? null,
         $datos['enlaces_video'] ?? null,
         $hash,
+        $datos['activo'] ?? 1,
+        $datos['estado'] ?? 'aprobado',
+        $datos['fuente'] ?? 'movil',
         $cancion_id
     ];
     

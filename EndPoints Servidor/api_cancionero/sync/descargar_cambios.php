@@ -28,17 +28,19 @@ try {
     $db->exec("SET time_zone = '-03:00'");
 
     // Obtener canciones modificadas/creadas después de la última sync
-    // Consulta CORREGIDA - usando nombres exactos de Flutter
+    // FILTRAR: Solo canciones aprobadas y activas
     $query = "SELECT 
                 s.id, s.titulo, s.autor, s.letra_con_acordes, s.tonalidad_original,
                 s.tempo_bpm, s.posicion_capo, s.es_favorita, s.preferred_font_size,
                 s.contador_reproducciones, s.fecha_creacion, s.fecha_modificacion,
-                s.notas, s.enlaces_video,
+                s.notas, s.enlaces_video, s.activo, s.estado, s.fuente, s.hash_contenido, s.version,
                 GROUP_CONCAT(DISTINCT c.nombre) as categorias
             FROM songs s
             LEFT JOIN cancion_categoria cc ON s.id = cc.cancion_id
             LEFT JOIN categories c ON cc.categoria_id = c.id
             WHERE s.fecha_modificacion > ?
+              AND s.estado = 'aprobado'
+              -- AND s.activo = 1
             GROUP BY s.id
             ORDER BY s.fecha_modificacion DESC";
 
